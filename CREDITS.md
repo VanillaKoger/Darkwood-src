@@ -22,5 +22,4 @@ CC0 needs no attribution — this file is thanks + provenance.
 ## Ground textures (CC0, Poly Haven) — `models/textures/`
 - Poly Haven **sparse_grass** — main terrain grass (`models/textures/grass/`) — https://polyhaven.com/a/sparse_grass
 - Poly Haven **dirt** — ring road + 4 cardinal roads (`models/textures/dirt/`) — https://polyhaven.com/a/dirt
-- Poly Haven **cobblestone_floor_08** — platform, rim, bridge approaches, stone patches (`models/textures/stone/`) — https://polyhaven.com/a/cobblestone_floor_08 (same set Bloodhunt used for cobble)
 All CC0 1.0. 1K JPG color/normal(GL), roughness downsized to 512; color desaturated 15%.

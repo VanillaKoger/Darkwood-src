@@ -106,29 +106,27 @@
     #script li.done { color: #7ec87e; text-decoration: line-through; }
     #script li.current { color: #fff; font-weight: 600; }
     #touch {
-      position: absolute;
-      right: 18px;
-      bottom: 18px;
-      width: 120px;
-      height: 120px;
-      pointer-events: auto;
-      display: none;
+      position: fixed; left: 0; top: 0;
+      width: 120px; height: 120px; margin: -60px 0 0 -60px;
+      pointer-events: none; display: none; z-index: 5;
       border-radius: 50%;
       background: rgba(255,255,255,0.08);
       border: 1px solid rgba(255,255,255,0.18);
     }
+    #touch.on { display: block; }
     #touch-knob {
-      position: absolute;
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
+      position: absolute; width: 48px; height: 48px; border-radius: 50%;
       background: rgba(200, 224, 138, 0.45);
       border: 1px solid rgba(200, 224, 138, 0.7);
-      left: 36px;
-      top: 36px;
+      left: 36px; top: 36px;
+    }
+    #touch-hint {
+      position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+      font: 600 11px system-ui, sans-serif; color: rgba(255,255,255,0.45);
+      pointer-events: none; display: none;
     }
     @media (pointer: coarse) {
-      #touch { display: block; }
+      #touch-hint { display: block; }
       #script { right: 150px; max-width: 360px; bottom: 126px; padding: 6px 10px; }
       #script li:not(.current) { display: none; }
     }
@@ -218,7 +216,7 @@
       <div class="panel" id="controls-hint">
         <strong>Controls</strong><br />
         Move: WASD / Arrows<br />
-        Phone: drag right pad<br />
+        Phone: drag anywhere<br />
         Camera: overhead isometric<br />
         Attack: auto in 2.5m / Space<br />Boss FX test: B
       </div>
@@ -239,6 +237,7 @@
     <div id="touch" aria-hidden="true">
       <div id="touch-knob"></div>
     </div>
+    <div id="touch-hint">drag anywhere to move</div>
     <div id="pstats"></div>
     <div id="combat">
       <button type="button" id="btn-attack">Attack</button>
@@ -407,7 +406,6 @@ const TEX = {};
 function initTextures() {
   TEX.grass = pbrSet("grass", 1);
   TEX.dirt = pbrSet("dirt", 1);
-  TEX.stone = pbrSet("stone", 1);
 }
 
 function addGround() {
@@ -499,27 +497,8 @@ function cardinalRoads() {
   }
 }
 
-function stoneMat(color, rep) {
-  const st = pbrSet("stone", rep);
-  return new THREE.MeshStandardMaterial({ ...st, color, roughness: 1 });
-}
-function stonePatches() {
-  const mat = new THREE.MeshStandardMaterial({ ...TEX.stone, color: 0xc8c0b0, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2 });
-  const add = (x, z, w, d, rot = 0) => {
-    const g = new THREE.CircleGeometry(1, 20); g.rotateX(-Math.PI / 2); g.scale(w, 1, d); g.rotateY(rot); g.translate(x, 0, z); worldUV(g, 3);
-    const m = new THREE.Mesh(g, mat); m.position.y = 0.05; m.receiveShadow = true; scene.add(m);
-  };
-  // bridge approaches (lake shore -> ring inner edge, E and W)
-  for (const s of [1, -1]) { const mid = (LAKE_R + RING_R - ROAD_W / 2) / 2; add(s * mid, 0, (RING_R - ROAD_W / 2 - LAKE_R) / 2 + 0.8, 3.4); }
-  // scattered patches / path borders off road shoulders
-  const rs = mulberry32(0x5707e);
-  for (let i = 0; i < 14; i++) {
-    const ang = rs() * Math.PI * 2, r = RING_R + (rs() < 0.5 ? -1 : 1) * (ROAD_W / 2 + 2.5 + rs() * 2);
-    add(Math.cos(ang) * r, Math.sin(ang) * r, 0.9 + rs() * 1.3, 0.7 + rs() * 0.9, rs() * 3);
-  }
-  for (const [x, z] of [[3, RING_R + 30], [-8.5, RING_R + 18], [8.5, -(RING_R + 20)], [RING_R + 25, 8], [-(RING_R + 22), -8.5],
-    // shack/spawn stoop + path borders by the S road end
-    [-6.5, HALF - 7], [6.8, HALF - 12], [-7.2, HALF - 15]]) add(x, z, 1.6, 1.1, x);
+function plainMat(color) {
+  return new THREE.MeshStandardMaterial({ color, roughness: 1 });
 }
 
 function lakeAndPlatform() {
@@ -533,7 +512,7 @@ function lakeAndPlatform() {
 
   const plat = new THREE.Mesh(
     new THREE.CylinderGeometry(PLATFORM_R, PLATFORM_R + 0.8, 1.4, 32),
-    stoneMat(0xb8b0a0, 4)
+    plainMat(0x8a7a62)
   );
   plat.position.y = 0.7;
   plat.castShadow = true;
@@ -542,7 +521,7 @@ function lakeAndPlatform() {
 
   const rim = new THREE.Mesh(
     new THREE.TorusGeometry(PLATFORM_R - 0.6, 0.18, 8, 40),
-    stoneMat(0xd8ccb0, 0.5)
+    plainMat(0x9a8a70)
   );
   rim.rotation.x = Math.PI / 2;
   rim.position.y = 1.45;
@@ -736,21 +715,33 @@ function setKnob(dx, dy) {
   const max = 36, len = Math.hypot(dx, dy) || 1, c = Math.min(1, max / len);
   touchKnob.style.transform = `translate(${dx * c}px, ${dy * c}px)`;
 }
+let joyId = null, joyX = 0, joyY = 0;
+const touchHint = document.getElementById("touch-hint");
 function padPointer(e) {
-  const rect = touchPad.getBoundingClientRect();
-  const dx = e.clientX - (rect.left + rect.width / 2);
-  const dy = e.clientY - (rect.top + rect.height / 2);
+  const dx = e.clientX - joyX, dy = e.clientY - joyY;
   const max = 48, len = Math.hypot(dx, dy) || 1, s = Math.min(1, max / len);
   touchVec.x = (dx / max) * s; touchVec.y = (dy / max) * s;
   setKnob(dx, dy);
 }
-touchPad.addEventListener("pointerdown", (e) => {
-  touchActive = true; touchPad.setPointerCapture(e.pointerId); padPointer(e);
-});
-touchPad.addEventListener("pointermove", (e) => { if (touchActive) padPointer(e); });
-function endTouch() { touchActive = false; touchVec.x = 0; touchVec.y = 0; setKnob(0, 0); }
-touchPad.addEventListener("pointerup", endTouch);
-touchPad.addEventListener("pointercancel", endTouch);
+const JOY_BLOCK = "button,a,input,select,textarea,label,#combat,#script,#hud,.panel";
+window.addEventListener("pointerdown", (e) => {
+  if (joyId !== null) return;
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  if (e.target.closest && e.target.closest(JOY_BLOCK)) return;
+  joyId = e.pointerId; touchActive = true; joyX = e.clientX; joyY = e.clientY;
+  touchPad.style.left = joyX + "px"; touchPad.style.top = joyY + "px";
+  touchPad.classList.add("on"); if (touchHint) touchHint.style.opacity = "0";
+  padPointer(e); e.preventDefault();
+}, { passive: false });
+window.addEventListener("pointermove", (e) => { if (e.pointerId === joyId) { padPointer(e); e.preventDefault(); } }, { passive: false });
+function endTouch(e) {
+  if (e && e.pointerId !== joyId) return;
+  joyId = null; touchActive = false; touchVec.x = 0; touchVec.y = 0; setKnob(0, 0);
+  touchPad.classList.remove("on"); if (touchHint) touchHint.style.opacity = "";
+}
+window.addEventListener("pointerup", endTouch);
+window.addEventListener("pointercancel", endTouch);
+window.addEventListener("blur", () => endTouch());
 btnReset.addEventListener("click", () => { elapsed = 0; timerEl.textContent = "0.0s"; });
 
 const loader = new GLTFLoader();
@@ -906,7 +897,6 @@ async function dressScene() {
   ringRoadMesh();
   cardinalRoads();
   lakeAndPlatform();
-  stonePatches();
   fireWall();
 
   // try HDRI (optional)

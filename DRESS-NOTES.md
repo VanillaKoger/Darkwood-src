@@ -94,7 +94,10 @@ Lean copies live under `graybox/models/` (~9 MB). Provenance packs remain under 
 - **Walk anim** timeScale 2.0 → **1.5** (move speed unchanged 7.7).
 - **Grass** (Poly Haven sparse_grass): world-space UV, 6 m tile, on the ground plane; old quadrant vertex colors kept as a tint (W/S greener, E/NE ash, north scorched).
 - **Dirt roads** (Poly Haven dirt): ring road = RingGeometry + wider feathered shoulder ring (alpha gradient via uv1 alphaMap); 4 cardinal roads = flat planes + feathered shoulder planes. 5 m tile. Layout constants unchanged.
-- **Stone** (Poly Haven cobblestone_floor_08): center platform + rim, E/W bridge approach pads (lake shore → ring), 14 scattered patches along ring shoulders, a few on cardinal-road edges and around the shack/spawn.
 - sRGB on color maps, anisotropy ≤8, mipmaps. Textures total ≈1.7 MB.
 - Preview: `textures-preview.png` (390×844 @2x).
-- Known issues: stone patches are hard-edged discs (no fade); dirt/grass blend is an alpha-fade shoulder, not a true splat; road crossings at ring overlap with transparent shoulders (minor sorting).
+- Known issues: dirt/grass blend is an alpha-fade shoulder, not a true splat; road crossings at ring overlap with transparent shoulders (minor sorting).
+
+## Stone removal + floating joystick (2026-11-02)
+- **Cobblestone removed entirely**: stone patches, bridge-approach pads, and platform/rim stone texturing deleted; `models/textures/stone/` removed (and from CREDITS). Platform + rim keep geometry with plain untextured earthy MeshStandardMaterial (0x8a7a62 / 0x9a8a70). Grass + dirt unchanged.
+- **Floating joystick**: pointerdown anywhere (except buttons, `#combat`, `#script`, `.panel`) spawns the base at the touch point; drag moves knob (48 px full deflection); release hides it. Tracks a single pointerId, so a second finger can tap Attack. Works with mouse drag on desktop; keys unchanged. Faint "drag anywhere to move" hint bottom-center on coarse pointers.
