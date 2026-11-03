@@ -367,7 +367,51 @@ function makeLabel(text, color) {
   return new CSS2DObject(el);
 }
 
+
+// ---- CC0 ground textures (Poly Haven) ----
+const texLoader = new THREE.TextureLoader();
+const MAX_ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+function loadTex(path, srgb, rep) {
+  const t = texLoader.load(path);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = MAX_ANISO;
+  t.generateMipmaps = true;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  if (rep) t.repeat.set(rep, rep);
+  return t;
+}
+function pbrSet(name, rep) {
+  const b = "models/textures/" + name + "/";
+  return {
+    map: loadTex(b + "color.jpg", true, rep),
+    normalMap: loadTex(b + "normal.jpg", false, rep),
+    roughnessMap: loadTex(b + "roughness.jpg", false, rep)
+  };
+}
+// world-space planar UVs (1 tile per `tile` meters) on an XZ geometry
+function worldUV(geo, tile) {
+  const p = geo.attributes.position, uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) { uv[i * 2] = p.getX(i) / tile; uv[i * 2 + 1] = p.getZ(i) / tile; }
+  geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+}
+// soft-edge alpha strip (fades toward v=0 and v=1 edges)
+function edgeFadeTex() {
+  const c = document.createElement("canvas"); c.width = 4; c.height = 64;
+  const g = c.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 64);
+  gr.addColorStop(0, "#000"); gr.addColorStop(0.3, "#fff"); gr.addColorStop(0.7, "#fff"); gr.addColorStop(1, "#000");
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 64);
+  return new THREE.CanvasTexture(c);
+}
+const TEX = {};
+function initTextures() {
+  TEX.grass = pbrSet("grass", 1);
+  TEX.dirt = pbrSet("dirt", 1);
+  TEX.stone = pbrSet("stone", 1);
+}
+
 function addGround() {
+  initTextures();
   const geo = new THREE.PlaneGeometry(WORLD, WORLD, 40, 40);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
@@ -380,10 +424,12 @@ function addGround() {
     if (z > RING_R * 0.2) { r *= 0.75; g *= 1.0; b *= 0.7; } // denser S
     if (x > RING_R * 0.15 && z < 0) { r = 0.32; g = 0.20; b = 0.12; } // E/NE ash
     if (z < -HALF * 0.55) { r = 0.38; g = 0.18; b = 0.10; } // near fire wall
-    colors[i * 3] = r; colors[i * 3 + 1] = g; colors[i * 3 + 2] = b;
+    // vertex color now a tint over the grass texture (base grass ≈ white-ish green)
+    colors[i * 3] = Math.min(1, r * 4.0); colors[i * 3 + 1] = Math.min(1, g * 3.3); colors[i * 3 + 2] = Math.min(1, b * 4.2);
   }
+  worldUV(geo, 6);
   geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, ...TEX.grass, normalScale: new THREE.Vector2(0.6, 0.6) });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;
   scene.add(mesh);
@@ -397,24 +443,34 @@ function addGround() {
   scene.add(edge);
 }
 
+function roadMat(opts = {}) {
+  return new THREE.MeshStandardMaterial({ ...TEX.dirt, color: 0xd8c4a8, roughness: 1, normalScale: new THREE.Vector2(0.7, 0.7), ...opts });
+}
 function ringRoadMesh() {
-  const shape = new THREE.Shape();
-  const outer = RING_R + ROAD_W / 2;
-  const inner = RING_R - ROAD_W / 2;
-  shape.absarc(0, 0, outer, 0, Math.PI * 2, false);
-  const hole = new THREE.Path();
-  hole.absarc(0, 0, inner, 0, Math.PI * 2, true);
-  shape.holes.push(hole);
-  const geo = new THREE.ShapeGeometry(shape, 64);
-  geo.rotateX(-Math.PI / 2);
-  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x6b5438, roughness: 0.92 }));
-  mesh.position.y = 0.04;
-  mesh.receiveShadow = true;
-  scene.add(mesh);
+  // core dirt ring + soft feathered shoulder (alpha fades across the width)
+  const core = new THREE.RingGeometry(RING_R - ROAD_W / 2, RING_R + ROAD_W / 2, 96, 1);
+  core.rotateX(-Math.PI / 2); worldUV(core, 5);
+  const mesh = new THREE.Mesh(core, roadMat());
+  mesh.position.y = 0.04; mesh.receiveShadow = true; scene.add(mesh);
+  const sh = new THREE.RingGeometry(RING_R - ROAD_W / 2 - 1.6, RING_R + ROAD_W / 2 + 1.6, 96, 1);
+  // uv2-style: alpha uses radial v; map uses world uv via custom attribute swap
+  const p = sh.attributes.position, a = new Float32Array(p.count * 2), w = new Float32Array(p.count * 2);
+  const r0 = RING_R - ROAD_W / 2 - 1.6, r1 = RING_R + ROAD_W / 2 + 1.6;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), r = Math.hypot(x, y);
+    a[i * 2] = 0.5; a[i * 2 + 1] = (r - r0) / (r1 - r0);
+    w[i * 2] = x / 5; w[i * 2 + 1] = -y / 5;
+  }
+  sh.setAttribute("uv", new THREE.BufferAttribute(w, 2));
+  sh.setAttribute("uv1", new THREE.BufferAttribute(a, 2));
+  sh.rotateX(-Math.PI / 2);
+  const fade = edgeFadeTex(); fade.channel = 1;
+  const shm = new THREE.Mesh(sh, roadMat({ alphaMap: fade, transparent: true, depthWrite: false, opacity: 0.85 }));
+  shm.position.y = 0.035; shm.receiveShadow = true; scene.add(shm);
 }
 
 function cardinalRoads() {
-  const mat = new THREE.MeshStandardMaterial({ color: 0x6b5438, roughness: 0.92 });
+  const mat = roadMat();
   const outer = HALF - 2;
   const spokeLen = outer - (RING_R - ROAD_W / 2);
   const hw = CARDINAL_HALF_W;
@@ -424,12 +480,46 @@ function cardinalRoads() {
     [RING_R + spokeLen / 2 - ROAD_W / 4, 0, spokeLen, hw * 2], // E
     [-(RING_R + spokeLen / 2 - ROAD_W / 4), 0, spokeLen, hw * 2] // W
   ];
+  const fade = edgeFadeTex(); fade.channel = 1;
+  const shMat = roadMat({ alphaMap: fade, transparent: true, depthWrite: false, opacity: 0.85 });
   for (const [x, z, w, d] of places) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, d), mat);
-    m.position.set(x, 0.04, z);
-    m.receiveShadow = true;
-    scene.add(m);
+    const g = new THREE.PlaneGeometry(w, d); g.rotateX(-Math.PI / 2); g.translate(x, 0, z); worldUV(g, 5);
+    const m = new THREE.Mesh(g, mat);
+    m.position.y = 0.045; m.receiveShadow = true; scene.add(m);
+    // feathered shoulder across the road width
+    const ns = w < d; const pad = 3.2;
+    const sg = new THREE.PlaneGeometry(ns ? w + pad : w, ns ? d : d + pad); sg.rotateX(-Math.PI / 2); sg.translate(x, 0, z); worldUV(sg, 5);
+    const p = sg.attributes.position, a = new Float32Array(p.count * 2);
+    for (let i = 0; i < p.count; i++) {
+      const t = ns ? (p.getX(i) - x) / (w + pad) + 0.5 : (p.getZ(i) - z) / (d + pad) + 0.5;
+      a[i * 2] = 0.5; a[i * 2 + 1] = t;
+    }
+    sg.setAttribute("uv1", new THREE.BufferAttribute(a, 2));
+    const sm = new THREE.Mesh(sg, shMat); sm.position.y = 0.038; sm.receiveShadow = true; scene.add(sm);
   }
+}
+
+function stoneMat(color, rep) {
+  const st = pbrSet("stone", rep);
+  return new THREE.MeshStandardMaterial({ ...st, color, roughness: 1 });
+}
+function stonePatches() {
+  const mat = new THREE.MeshStandardMaterial({ ...TEX.stone, color: 0xc8c0b0, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2 });
+  const add = (x, z, w, d, rot = 0) => {
+    const g = new THREE.CircleGeometry(1, 20); g.rotateX(-Math.PI / 2); g.scale(w, 1, d); g.rotateY(rot); g.translate(x, 0, z); worldUV(g, 3);
+    const m = new THREE.Mesh(g, mat); m.position.y = 0.05; m.receiveShadow = true; scene.add(m);
+  };
+  // bridge approaches (lake shore -> ring inner edge, E and W)
+  for (const s of [1, -1]) { const mid = (LAKE_R + RING_R - ROAD_W / 2) / 2; add(s * mid, 0, (RING_R - ROAD_W / 2 - LAKE_R) / 2 + 0.8, 3.4); }
+  // scattered patches / path borders off road shoulders
+  const rs = mulberry32(0x5707e);
+  for (let i = 0; i < 14; i++) {
+    const ang = rs() * Math.PI * 2, r = RING_R + (rs() < 0.5 ? -1 : 1) * (ROAD_W / 2 + 2.5 + rs() * 2);
+    add(Math.cos(ang) * r, Math.sin(ang) * r, 0.9 + rs() * 1.3, 0.7 + rs() * 0.9, rs() * 3);
+  }
+  for (const [x, z] of [[3, RING_R + 30], [-8.5, RING_R + 18], [8.5, -(RING_R + 20)], [RING_R + 25, 8], [-(RING_R + 22), -8.5],
+    // shack/spawn stoop + path borders by the S road end
+    [-6.5, HALF - 7], [6.8, HALF - 12], [-7.2, HALF - 15]]) add(x, z, 1.6, 1.1, x);
 }
 
 function lakeAndPlatform() {
@@ -443,7 +533,7 @@ function lakeAndPlatform() {
 
   const plat = new THREE.Mesh(
     new THREE.CylinderGeometry(PLATFORM_R, PLATFORM_R + 0.8, 1.4, 32),
-    new THREE.MeshStandardMaterial({ color: 0x5c4a32, roughness: 0.88 })
+    stoneMat(0xb8b0a0, 4)
   );
   plat.position.y = 0.7;
   plat.castShadow = true;
@@ -452,7 +542,7 @@ function lakeAndPlatform() {
 
   const rim = new THREE.Mesh(
     new THREE.TorusGeometry(PLATFORM_R - 0.6, 0.18, 8, 40),
-    new THREE.MeshStandardMaterial({ color: 0xc8b478, roughness: 0.7 })
+    stoneMat(0xd8ccb0, 0.5)
   );
   rim.rotation.x = Math.PI / 2;
   rim.position.y = 1.45;
@@ -816,6 +906,7 @@ async function dressScene() {
   ringRoadMesh();
   cardinalRoads();
   lakeAndPlatform();
+  stonePatches();
   fireWall();
 
   // try HDRI (optional)
@@ -1144,7 +1235,7 @@ async function dressScene() {
     const walk = findClip(rigClips, ["Walking_A"]);
     playerAnim = { mixer, idle: idle && mixer.clipAction(idle), walk: walk && mixer.clipAction(walk), moving: false };
     if (playerAnim.idle) playerAnim.idle.play();
-    if (playerAnim.walk) { playerAnim.walk.timeScale = 2; playerAnim.walk.play(); playerAnim.walk.setEffectiveWeight(0); }
+    if (playerAnim.walk) { playerAnim.walk.timeScale = 1.5; playerAnim.walk.play(); playerAnim.walk.setEffectiveWeight(0); }
     mixers.push(mixer);
   }
 

@@ -89,3 +89,12 @@ Lean copies live under `graybox/models/` (~9 MB). Provenance packs remain under 
 - `WALK_SPEED` 3.85 → 7.7 (exactly 2x). Player walk clip `timeScale` 1 → 2 to limit foot skate.
 - Training Yard: 4 stationary KayKit skeleton dummies (Minion/Warrior, Idle_A, no patrol, don't fight back) in a 2x2 grid at x 10–12.6, z HALF-13..HALF-10, east of the shack spawn and off the S road; "Training Yard" label. Registered as `skeleton` trash (30 HP, HP bars, damage numbers, Nature-green essence stream, +1 Armor).
 - `regEnemy` opts: `respawn` (seconds, default 20) and `dummy`. Dummies respawn at the same spot with full HP 1.0s after the killing blow (0.35s shrink + 0.65s hidden). Debug: `window.__dummyRespawnMs` logs measured game/wall delay.
+
+## Ground texture pass (2026-11-02)
+- **Walk anim** timeScale 2.0 → **1.5** (move speed unchanged 7.7).
+- **Grass** (Poly Haven sparse_grass): world-space UV, 6 m tile, on the ground plane; old quadrant vertex colors kept as a tint (W/S greener, E/NE ash, north scorched).
+- **Dirt roads** (Poly Haven dirt): ring road = RingGeometry + wider feathered shoulder ring (alpha gradient via uv1 alphaMap); 4 cardinal roads = flat planes + feathered shoulder planes. 5 m tile. Layout constants unchanged.
+- **Stone** (Poly Haven cobblestone_floor_08): center platform + rim, E/W bridge approach pads (lake shore → ring), 14 scattered patches along ring shoulders, a few on cardinal-road edges and around the shack/spawn.
+- sRGB on color maps, anisotropy ≤8, mipmaps. Textures total ≈1.7 MB.
+- Preview: `textures-preview.png` (390×844 @2x).
+- Known issues: stone patches are hard-edged discs (no fade); dirt/grass blend is an alpha-fade shoulder, not a true splat; road crossings at ring overlap with transparent shoulders (minor sorting).
