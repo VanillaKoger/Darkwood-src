@@ -73,3 +73,14 @@ Lean copies live under `graybox/models/` (~9 MB). Provenance packs remain under 
 - Fade uses bounding-footprint test, not per-ray mesh hits — large trees may fade a touch early.
 - Three.js still from jsDelivr CDN (needs network).
 - `models/` ~19 MB; first load on mobile data takes a few seconds.
+
+## Kill → absorb prototype (2026-11-02)
+- **Attack:** auto-attack ON by default — every 0.6s (÷ attack speed) all enemies within 2.5m (+ enemy radius) take 10 (+DMG) damage. Manual: big **Attack** button (bottom-left) / Space. **Auto: ON/OFF** toggle / T.
+- **Feedback:** head HP bars (show after first hit, 6s), floating yellow damage numbers (pooled CSS2D).
+- **Death:** model shrinks/dissolves (0.35s; boss 0.7s) → 24–40 additive glowing particles in the biome element colour (Darkwood = Nature `#5BE36A`; `ELEMENT_COLORS` also defines Cold `#8FD8FF`, Fire `#FF7A2A`, Lightning `#D8C8FF`). Burst outward, hang ~0.3s, then quadratic-bezier home onto the player with 3-point trails. No pickup radius — always auto-absorbed.
+- **Arrival:** green ring pulse + point-light glow on player, floating gain text. Gains per enemy *type* (element is per biome, all Darkwood = Nature): beasts +1 HP, spirits +1% atk spd, bandits +1 DMG, skeletons +1 Armor. HUD stat line above the Attack button.
+- **Bosses:** center bandit king (skeleton warrior stand-in, 260 HP) and SW legendary dragon (300 HP): ~120 particles, 0.75s hang, slower stream, big repeating pulse, +10 gain.
+- **Debug:** **Boss test** button / **B** key spawns the boss stream 6m in front of the player.
+- **Respawn:** 20s, full HP.
+- **Perf:** single pooled `THREE.Points` (1400 particles × 4 verts incl. trails), struct-of-arrays state, no per-frame allocations in the FX loop.
+- Known: no regular bandit enemies yet (only the king); enemies don't fight back; dissolve is scale-only (no material fade); on phones the walk script collapses to the current step to make room for combat buttons.

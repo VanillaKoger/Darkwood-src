@@ -129,7 +129,8 @@
     }
     @media (pointer: coarse) {
       #touch { display: block; }
-      #script { right: 150px; max-width: 360px; }
+      #script { right: 150px; max-width: 360px; bottom: 126px; padding: 6px 10px; }
+      #script li:not(.current) { display: none; }
     }
     #title {
       position: absolute;
@@ -183,6 +184,16 @@
     @media (pointer: coarse) {
       #minimap { bottom: 148px; }
     }
+    .hpbar { width: 44px; height: 5px; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.35); border-radius: 3px; transform: translate(-50%,-100%); pointer-events: none; }
+    .hpbar i { display: block; height: 100%; width: 100%; background: #e04a3a; border-radius: 2px; }
+    .ftxt { font: 700 14px system-ui, sans-serif; color: #fff; text-shadow: 0 1px 2px #000; pointer-events: none; white-space: nowrap; transform: translate(-50%,-100%); }
+    .ftxt.dmg { color: #ffe08a; }
+    .ftxt.gain { color: #7dff8c; font-size: 15px; }
+    .ftxt.gain.boss { font-size: 24px; color: #a8ffb2; }
+    #combat { position: absolute; left: 12px; bottom: 18px; display: flex; gap: 8px; align-items: flex-end; pointer-events: auto; flex-wrap: wrap; max-width: 60vw; }
+    #combat button { font: 600 13px system-ui, sans-serif; color: var(--text); background: rgba(20,28,16,0.85); border: 1px solid rgba(200,224,138,0.45); border-radius: 10px; padding: 8px 10px; touch-action: manipulation; }
+    #combat #btn-attack { width: 72px; height: 72px; border-radius: 50%; font-size: 14px; background: rgba(90,140,60,0.55); }
+    #pstats { position: absolute; left: 12px; bottom: 100px; font: 600 11px system-ui, sans-serif; color: #c8f0b0; background: rgba(8,10,6,0.7); padding: 4px 8px; border-radius: 6px; pointer-events: none; }
   </style>
   <script type="importmap">
   {
@@ -209,7 +220,7 @@
         Move: WASD / Arrows<br />
         Phone: drag right pad<br />
         Camera: overhead isometric<br />
-        Reset timer: button →
+        Attack: auto in 2.5m / Space<br />Boss FX test: B
       </div>
       <button type="button" id="btn-reset">Reset timer</button>
     </div>
@@ -227,6 +238,12 @@
     </div>
     <div id="touch" aria-hidden="true">
       <div id="touch-knob"></div>
+    </div>
+    <div id="pstats"></div>
+    <div id="combat">
+      <button type="button" id="btn-attack">Attack</button>
+      <button type="button" id="btn-auto">Auto: ON</button>
+      <button type="button" id="btn-boss">Boss test</button>
     </div>
     <canvas id="minimap" width="220" height="220"></canvas>
   </div>
@@ -984,6 +1001,7 @@ async function dressScene() {
   fitScale(skelBoss, 2.4);
   place(skelBoss, 0, 1, Math.PI);
   animate(skelBoss, rigClips, ["Idle_B", "Idle_A"]);
+  regEnemy(skelBoss, "bandit", { boss: true, hp: 260 });
   const bossLab = makeLabel("Bandit boss / hideout", "#f0a888");
   bossLab.position.set(0, 6.5, 0);
   scene.add(bossLab);
@@ -1006,6 +1024,7 @@ async function dressScene() {
   place(ghost, landmarks[2].x, landmarks[2].y, 0);
   bobbers.push({ obj: ghost, baseY: ghost.position.y, phase: 0 });
   animate(ghost, ghost.userData.clips, ["Flying_Idle"]);
+  regEnemy(ghost, "spirit", { hp: 50 });
   const spiritLab = makeLabel("Dark spirit / ruins", "#c8b8f0");
   spiritLab.position.set(landmarks[2].x, 7.5, landmarks[2].y);
   scene.add(spiritLab);
@@ -1026,6 +1045,7 @@ async function dressScene() {
   place(dragon, landmarks[1].x, landmarks[1].y, Math.PI * 0.7);
   bobbers.push({ obj: dragon, baseY: dragon.position.y, phase: 1.2, amp: 0.25 });
   animate(dragon, dragon.userData.clips, ["Flying_Idle"]);
+  regEnemy(dragon, "beast", { boss: true, hp: 300 });
   const animals = [
     ["models/quaternius/Wolf.glb", landmarks[1].x + 6, landmarks[1].y + 4, 2.0],
     ["models/quaternius/Wolf.glb", landmarks[1].x - 5, landmarks[1].y + 2, 1.9],
@@ -1038,6 +1058,7 @@ async function dressScene() {
     fitScale(a, h);
     place(a, x, z, rand() * Math.PI * 2);
     animate(a, a.userData.clips, [rand() < 0.5 ? "Idle" : "Eating", "Idle"]);
+    regEnemy(a, "beast");
   }
   // West beast quadrant: full Quaternius Animated Animal Pack (12) in dens off the W road.
   // Grazers idle/eat; wolves/huskies/foxes patrol (Walk) on small loops.
@@ -1065,6 +1086,7 @@ async function dressScene() {
       } else {
         animate(a, a.userData.clips, beh === "graze" ? ["Eating", "Idle"] : ["Idle", "Idle_2"]);
       }
+      regEnemy(a, "beast");
     }
   }
   const westLab = makeLabel("West beast dens", "#d0c090");
@@ -1091,6 +1113,7 @@ async function dressScene() {
     } else {
       animate(sk, rigClips, [i % 2 ? "Idle_B" : "Idle_A"]);
     }
+    regEnemy(sk, "skeleton");
   }
 
   // Road labels
@@ -1124,6 +1147,281 @@ async function dressScene() {
     place(pine, x, z, rand(), true);
   }
 }
+
+// ===================== Kill → absorb prototype =====================
+// Element palette (curse chain Nature→Cold→Fire→Lightning, one per biome). Darkwood = Nature.
+const ELEMENT_COLORS = {
+  nature: new THREE.Color(0x5be36a),
+  cold: new THREE.Color(0x8fd8ff),
+  fire: new THREE.Color(0xff7a2a),
+  lightning: new THREE.Color(0xd8c8ff)
+};
+const BIOME_ELEMENT = "nature";
+const ATTACK_RANGE = 2.5, ATTACK_PERIOD = 0.6, BASE_DMG = 10;
+// Per-enemy-type stat gain (stat variety only; element comes from the biome)
+const TYPE_GAIN = {
+  beast: { stat: "hp", label: "+1 HP", amt: 1 },
+  spirit: { stat: "aspd", label: "+1% atk spd", amt: 0.01 },
+  bandit: { stat: "dmg", label: "+1 DMG", amt: 1 },
+  skeleton: { stat: "armor", label: "+1 Armor", amt: 1 }
+};
+const stats = { hp: 100, aspd: 1, dmg: 0, armor: 0, kills: 0 };
+const enemies = [];
+let autoAttack = true, attackTimer = 0, manualAttackQueued = false;
+const _v = new THREE.Vector3();
+
+function regEnemy(obj, type, opts = {}) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const h = box.max.y - box.min.y;
+  const r = Math.max(0.6, Math.min(3, Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * 0.4));
+  const bar = document.createElement("div");
+  bar.className = "hpbar"; bar.innerHTML = "<i></i>";
+  const barObj = new CSS2DObject(bar);
+  barObj.visible = false;
+  scene.add(barObj);
+  const maxHp = opts.hp ?? (opts.boss ? 260 : type === "beast" ? 40 : 30);
+  enemies.push({ obj, type, boss: !!opts.boss, gain: TYPE_GAIN[opts.gainType || type], maxHp, hp: maxHp,
+    h, r, bar, fill: bar.firstChild, barObj, baseScale: obj.scale.clone(), state: "alive", t: 0, lastHit: -99 });
+}
+
+// ---- Particle pool: one Points, heads + 3 trail ghosts each, additive ----
+const P_MAX = 1400, TRAIL = 3, P_VERTS = P_MAX * (TRAIL + 1);
+const pPos = new Float32Array(P_VERTS * 3), pCol = new Float32Array(P_VERTS * 3);
+const pp = { // per-particle state (struct of arrays, no allocations)
+  alive: new Uint8Array(P_MAX), t: new Float32Array(P_MAX), hang: new Float32Array(P_MAX), fly: new Float32Array(P_MAX),
+  x: new Float32Array(P_MAX), y: new Float32Array(P_MAX), z: new Float32Array(P_MAX),
+  vx: new Float32Array(P_MAX), vy: new Float32Array(P_MAX), vz: new Float32Array(P_MAX),
+  sx: new Float32Array(P_MAX), sy: new Float32Array(P_MAX), sz: new Float32Array(P_MAX),
+  cx: new Float32Array(P_MAX), cy: new Float32Array(P_MAX), cz: new Float32Array(P_MAX),
+  r: new Float32Array(P_MAX), g: new Float32Array(P_MAX), b: new Float32Array(P_MAX),
+  burst: new Int16Array(P_MAX), hist: new Float32Array(P_MAX * TRAIL * 3)
+};
+for (let i = 0; i < P_VERTS; i++) pPos[i * 3 + 1] = -999;
+const pGeo = new THREE.BufferGeometry();
+pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3).setUsage(THREE.DynamicDrawUsage));
+pGeo.setAttribute("color", new THREE.BufferAttribute(pCol, 3).setUsage(THREE.DynamicDrawUsage));
+pGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5);
+const dotTex = (() => {
+  const c = document.createElement("canvas"); c.width = c.height = 32;
+  const g = c.getContext("2d"), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.35, "rgba(255,255,255,0.6)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
+  return new THREE.CanvasTexture(c);
+})();
+const pMat = new THREE.PointsMaterial({ size: 0.55, map: dotTex, vertexColors: true, transparent: true,
+  depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true });
+const pPoints = new THREE.Points(pGeo, pMat);
+pPoints.frustumCulled = false; pPoints.renderOrder = 5;
+scene.add(pPoints);
+
+// Burst bookkeeping (fixed pool)
+const BURST_MAX = 32;
+const bursts = Array.from({ length: BURST_MAX }, () => ({ used: false, left: 0, first: true, boss: false, gain: null }));
+let pCursor = 0;
+
+function spawnAbsorb(x, y, z, gain, boss) {
+  let bi = bursts.findIndex((b) => !b.used);
+  if (bi < 0) bi = 0;
+  const B = bursts[bi];
+  const n = boss ? 120 : 24 + ((Math.random() * 17) | 0);
+  B.used = true; B.left = n; B.first = true; B.boss = boss; B.gain = gain;
+  const col = ELEMENT_COLORS[BIOME_ELEMENT];
+  for (let k = 0; k < n; k++) {
+    let i = -1;
+    for (let s = 0; s < P_MAX; s++) { const j = (pCursor + s) % P_MAX; if (!pp.alive[j]) { i = j; break; } }
+    if (i < 0) { B.left--; continue; }
+    pCursor = (i + 1) % P_MAX;
+    pp.alive[i] = 1; pp.t[i] = 0; pp.burst[i] = bi;
+    pp.hang[i] = (boss ? 0.75 : 0.3) + Math.random() * 0.12;
+    pp.fly[i] = (boss ? 1.3 : 0.55) + Math.random() * (boss ? 0.6 : 0.25);
+    pp.x[i] = x + (Math.random() - 0.5) * 0.6; pp.y[i] = y + Math.random() * (boss ? 2.5 : 1.2); pp.z[i] = z + (Math.random() - 0.5) * 0.6;
+    const a = Math.random() * Math.PI * 2, sp = (boss ? 6 : 4) * (0.5 + Math.random());
+    pp.vx[i] = Math.cos(a) * sp; pp.vz[i] = Math.sin(a) * sp; pp.vy[i] = 1.5 + Math.random() * (boss ? 5 : 3);
+    const j = 0.75 + Math.random() * 0.5;
+    pp.r[i] = Math.min(1, col.r * j); pp.g[i] = Math.min(1, col.g * j); pp.b[i] = Math.min(1, col.b * j);
+    for (let h = 0; h < TRAIL; h++) { const o = (i * TRAIL + h) * 3; pp.hist[o] = pp.x[i]; pp.hist[o + 1] = pp.y[i]; pp.hist[o + 2] = pp.z[i]; }
+  }
+  if (B.left <= 0) B.used = false;
+}
+
+function updateParticles(dt, px, py, pz) {
+  for (let i = 0; i < P_MAX; i++) {
+    const head = i * (TRAIL + 1) * 3;
+    if (!pp.alive[i]) { if (pPos[head + 1] !== -999) for (let h = 0; h <= TRAIL; h++) pPos[head + h * 3 + 1] = -999; continue; }
+    pp.t[i] += dt;
+    const t = pp.t[i], hang = pp.hang[i];
+    // shift trail history
+    const ho = i * TRAIL * 3;
+    for (let h = TRAIL - 1; h > 0; h--) { pp.hist[ho + h * 3] = pp.hist[ho + (h - 1) * 3]; pp.hist[ho + h * 3 + 1] = pp.hist[ho + (h - 1) * 3 + 1]; pp.hist[ho + h * 3 + 2] = pp.hist[ho + (h - 1) * 3 + 2]; }
+    pp.hist[ho] = pp.x[i]; pp.hist[ho + 1] = pp.y[i]; pp.hist[ho + 2] = pp.z[i];
+    if (t < hang) {
+      const damp = Math.exp(-4.5 * dt);
+      pp.vx[i] *= damp; pp.vy[i] = pp.vy[i] * damp - 2.0 * dt; pp.vz[i] *= damp;
+      pp.x[i] += pp.vx[i] * dt; pp.y[i] += pp.vy[i] * dt; pp.z[i] += pp.vz[i] * dt;
+      if (t + dt >= hang) { // freeze bezier start + control (outward + up)
+        pp.sx[i] = pp.x[i]; pp.sy[i] = pp.y[i]; pp.sz[i] = pp.z[i];
+        pp.cx[i] = pp.x[i] + pp.vx[i] * 2.5 + (Math.random() - 0.5) * 3; pp.cy[i] = pp.y[i] + 2.5 + Math.random() * 2; pp.cz[i] = pp.z[i] + pp.vz[i] * 2.5 + (Math.random() - 0.5) * 3;
+      }
+    } else {
+      let u = (t - hang) / pp.fly[i];
+      if (u >= 1) { pp.alive[i] = 0; onArrive(pp.burst[i]); continue; }
+      u = u * u * (3 - 2 * u) * 0.35 + u * u * 0.65; // ease-in toward player
+      const a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, c = u * u;
+      pp.x[i] = a * pp.sx[i] + b * pp.cx[i] + c * px;
+      pp.y[i] = a * pp.sy[i] + b * pp.cy[i] + c * py;
+      pp.z[i] = a * pp.sz[i] + b * pp.cz[i] + c * pz;
+    }
+    pPos[head] = pp.x[i]; pPos[head + 1] = pp.y[i]; pPos[head + 2] = pp.z[i];
+    pCol[head] = pp.r[i]; pCol[head + 1] = pp.g[i]; pCol[head + 2] = pp.b[i];
+    for (let h = 0; h < TRAIL; h++) {
+      const o = head + (h + 1) * 3, f = 0.55 / (h + 1.4);
+      pPos[o] = pp.hist[ho + h * 3]; pPos[o + 1] = pp.hist[ho + h * 3 + 1]; pPos[o + 2] = pp.hist[ho + h * 3 + 2];
+      pCol[o] = pp.r[i] * f; pCol[o + 1] = pp.g[i] * f; pCol[o + 2] = pp.b[i] * f;
+    }
+  }
+  pGeo.attributes.position.needsUpdate = true;
+  pGeo.attributes.color.needsUpdate = true;
+}
+
+// ---- Player pulse ring ----
+const ringMat = new THREE.MeshBasicMaterial({ color: ELEMENT_COLORS[BIOME_ELEMENT], transparent: true, opacity: 0,
+  blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 1.0, 40), ringMat);
+ring.rotation.x = -Math.PI / 2; ring.renderOrder = 6;
+scene.add(ring);
+const glow = new THREE.PointLight(ELEMENT_COLORS[BIOME_ELEMENT], 0, 8, 2);
+scene.add(glow);
+const pulse = { t: 1, dur: 0.45, big: false };
+function triggerPulse(big) { pulse.t = 0; pulse.dur = big ? 0.9 : 0.4; pulse.big = big; }
+function updatePulse(dt, px, py, pz) {
+  pulse.t += dt;
+  const k = Math.min(1, pulse.t / pulse.dur);
+  const s = (pulse.big ? 1 + k * 4.5 : 1 + k * 1.8);
+  ring.scale.set(s, s, s);
+  ring.position.set(px, py + 0.08, pz);
+  ringMat.opacity = k >= 1 ? 0 : (1 - k) * (pulse.big ? 1 : 0.85);
+  glow.position.set(px, py + 1.2, pz);
+  glow.intensity = k >= 1 ? 0 : (1 - k) * (pulse.big ? 6 : 2.5);
+}
+
+function onArrive(bi) {
+  const B = bursts[bi];
+  if (!B.used) return;
+  if (B.first) {
+    B.first = false;
+    triggerPulse(B.boss);
+    if (B.gain) {
+      const amt = B.boss ? B.gain.amt * 10 : B.gain.amt;
+      stats[B.gain.stat] += amt;
+      const lab = B.boss ? B.gain.label.replace("+1", "+10") : B.gain.label;
+      floatText(_v.set(player.x, playerY() + 2.6, player.y), lab, B.boss ? "gain boss" : "gain");
+      updateStatsHud();
+    }
+  } else if (B.boss && B.left % 30 === 0) triggerPulse(true);
+  if (--B.left <= 0) B.used = false;
+}
+
+// ---- Floating text pool (CSS2D) ----
+const FT_MAX = 24;
+const fts = Array.from({ length: FT_MAX }, () => {
+  const el = document.createElement("div"); el.className = "ftxt";
+  const o = new CSS2DObject(el); o.visible = false; scene.add(o);
+  return { o, el, t: 9, vy: 0 };
+});
+let ftCursor = 0;
+function floatText(pos, text, cls) {
+  const f = fts[ftCursor]; ftCursor = (ftCursor + 1) % FT_MAX;
+  f.el.textContent = text; f.el.className = "ftxt " + cls;
+  f.o.position.copy(pos); f.o.position.x += (Math.random() - 0.5) * 0.6;
+  f.t = 0; f.vy = cls.startsWith("gain") ? 1.0 : 1.6; f.o.visible = true;
+}
+function updateFloatText(dt) {
+  for (const f of fts) {
+    if (!f.o.visible) continue;
+    f.t += dt; f.o.position.y += f.vy * dt;
+    const life = f.el.className.includes("boss") ? 1.8 : 0.9;
+    f.el.style.opacity = String(Math.max(0, 1 - f.t / life));
+    if (f.t >= life) f.o.visible = false;
+  }
+}
+
+function playerY() { return player.onPlatform ? 1.4 : 0; }
+
+function killEnemy(e, forceBoss) {
+  e.state = "dying"; e.t = 0; e.barObj.visible = false;
+  stats.kills++;
+  const p = e.obj.position;
+  spawnAbsorb(p.x, p.y + e.h * 0.4, p.z, e.gain, forceBoss || e.boss);
+}
+
+function doAttack() {
+  const dmg = BASE_DMG + stats.dmg;
+  let hit = false;
+  for (const e of enemies) {
+    if (e.state !== "alive") continue;
+    const d = Math.hypot(e.obj.position.x - player.x, e.obj.position.z - player.y);
+    if (d > ATTACK_RANGE + e.r) continue;
+    hit = true;
+    e.hp -= dmg; e.lastHit = elapsedReal;
+    floatText(_v.set(e.obj.position.x, e.obj.position.y + e.h + 0.4, e.obj.position.z), String(dmg), "dmg");
+    if (e.hp <= 0) killEnemy(e);
+  }
+  return hit;
+}
+
+let elapsedReal = 0;
+function updateCombat(dt) {
+  elapsedReal += dt;
+  attackTimer -= dt;
+  const period = ATTACK_PERIOD / stats.aspd;
+  if (manualAttackQueued || (autoAttack && attackTimer <= 0)) {
+    if (attackTimer <= 0 || manualAttackQueued) {
+      if (attackTimer <= 0) { doAttack(); attackTimer = period; }
+    }
+    manualAttackQueued = false;
+  }
+  for (const e of enemies) {
+    if (e.state === "alive") {
+      const show = e.hp < e.maxHp && elapsedReal - e.lastHit < 6;
+      e.barObj.visible = show;
+      if (show) {
+        e.barObj.position.set(e.obj.position.x, e.obj.position.y + e.h + 0.3, e.obj.position.z);
+        e.fill.style.width = Math.max(0, (e.hp / e.maxHp) * 100).toFixed(0) + "%";
+      }
+    } else if (e.state === "dying") {
+      e.t += dt;
+      const k = Math.min(1, e.t / (e.boss ? 0.7 : 0.35));
+      const s = 1 - k * k;
+      e.obj.scale.set(e.baseScale.x * s, e.baseScale.y * s, e.baseScale.z * s);
+      if (k >= 1) { e.obj.visible = false; e.state = "dead"; e.t = 0; }
+    } else if (e.state === "dead") {
+      e.t += dt;
+      if (e.t >= 20) { e.state = "alive"; e.hp = e.maxHp; e.obj.visible = true; e.obj.scale.copy(e.baseScale); }
+    }
+  }
+}
+
+function bossTest() {
+  const a = player.facing;
+  spawnAbsorb(player.x + Math.sin(a) * 6, playerY() + 1, player.y + Math.cos(a) * 6, TYPE_GAIN.bandit, true);
+}
+
+const statsHudEl = document.getElementById("pstats");
+function updateStatsHud() {
+  statsHudEl.textContent = `HP ${stats.hp} · DMG ${BASE_DMG + stats.dmg} · ASPD ${(stats.aspd * 100).toFixed(0)}% · ARM ${stats.armor} · kills ${stats.kills}`;
+}
+document.getElementById("btn-attack").addEventListener("pointerdown", (e) => { e.preventDefault(); manualAttackQueued = true; if (attackTimer <= 0) { doAttack(); attackTimer = ATTACK_PERIOD / stats.aspd; } });
+const btnAuto = document.getElementById("btn-auto");
+btnAuto.addEventListener("click", () => { autoAttack = !autoAttack; btnAuto.textContent = "Auto: " + (autoAttack ? "ON" : "OFF"); });
+document.getElementById("btn-boss").addEventListener("click", bossTest);
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space") { e.preventDefault(); if (attackTimer <= 0) { doAttack(); attackTimer = ATTACK_PERIOD / stats.aspd; } }
+  if (e.code === "KeyB") bossTest();
+  if (e.code === "KeyT") { btnAuto.click(); }
+});
+updateStatsHud();
+window.__dw = { stats, enemies, bossTest, doAttack, spawnAbsorb, player };
+// ===================== end kill prototype =====================
 
 function updateCamera() {
   const target = new THREE.Vector3(player.x, player.onPlatform ? 1.4 : 0, player.y);
@@ -1180,6 +1478,10 @@ function frame(ts) {
 
   updateCamera();
   updateOcclusion(dt);
+  updateCombat(dt);
+  updateParticles(dt, player.x, playerY() + 1.1, player.y);
+  updatePulse(dt, player.x, playerY(), player.y);
+  updateFloatText(dt);
   drawMinimap();
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
