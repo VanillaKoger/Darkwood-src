@@ -170,17 +170,13 @@
     }
     #minimap {
       position: absolute;
-      right: 10px;
-      bottom: 10px;
-      width: 110px;
-      height: 110px;
+      right: calc(10px + env(safe-area-inset-right));
+      bottom: calc(10px + env(safe-area-inset-bottom));
+      width: 110px; height: 110px;
       border-radius: 8px;
       border: 1px solid rgba(200,224,138,0.35);
       background: rgba(10,14,8,0.75);
-      pointer-events: none;
-    }
-    @media (pointer: coarse) {
-      #minimap { bottom: 148px; }
+      pointer-events: auto;
     }
     .hpbar { width: 44px; height: 5px; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.35); border-radius: 3px; transform: translate(-50%,-100%); pointer-events: none; }
     .hpbar i { display: block; height: 100%; width: 100%; background: #e04a3a; border-radius: 2px; }
@@ -188,10 +184,9 @@
     .ftxt.dmg { color: #ffe08a; }
     .ftxt.gain { color: #7dff8c; font-size: 15px; }
     .ftxt.gain.boss { font-size: 24px; color: #a8ffb2; }
-    #combat { position: absolute; left: 12px; bottom: 18px; display: flex; gap: 8px; align-items: flex-end; pointer-events: auto; flex-wrap: wrap; max-width: 60vw; }
-    #combat button { font: 600 13px system-ui, sans-serif; color: var(--text); background: rgba(20,28,16,0.85); border: 1px solid rgba(200,224,138,0.45); border-radius: 10px; padding: 8px 10px; touch-action: manipulation; }
-    #combat #btn-attack { width: 72px; height: 72px; border-radius: 50%; font-size: 14px; background: rgba(90,140,60,0.55); }
-    #pstats { position: absolute; left: 12px; bottom: 100px; font: 600 11px system-ui, sans-serif; color: #c8f0b0; background: rgba(8,10,6,0.7); padding: 4px 8px; border-radius: 6px; pointer-events: none; }
+    #combat { position: absolute; left: calc(12px + env(safe-area-inset-left)); bottom: calc(12px + env(safe-area-inset-bottom)); pointer-events: auto; }
+    #combat button { font: 600 13px system-ui, sans-serif; color: var(--text); background: rgba(20,28,16,0.85); border: 1px solid rgba(200,224,138,0.45); border-radius: 8px; padding: 6px 10px; font-size: 12px; touch-action: manipulation; }
+    #pstats { position: absolute; left: calc(12px + env(safe-area-inset-left)); bottom: calc(50px + env(safe-area-inset-bottom)); max-width: calc(100vw - 150px); white-space: normal; font: 600 11px system-ui, sans-serif; color: #c8f0b0; background: rgba(8,10,6,0.7); padding: 4px 8px; border-radius: 6px; pointer-events: none; }
   </style>
   <script type="importmap">
   {
@@ -213,35 +208,13 @@
         <div class="row"><span class="label">Nearest</span><span class="landmark" id="nearest">—</span></div>
         <div class="row"><span class="label">N–S tip</span><span class="value" id="crosshint">~50s target</span></div>
       </div>
-      <div class="panel" id="controls-hint">
-        <strong>Controls</strong><br />
-        Move: WASD / Arrows<br />
-        Phone: drag anywhere<br />
-        Camera: overhead isometric<br />
-        Attack: auto in 2.5m / Space<br />Boss FX test: B
-      </div>
-      <button type="button" id="btn-reset">Reset timer</button>
-    </div>
-    <div class="panel" id="script">
-      <h3>Fixed walk script</h3>
-      <ol id="script-list">
-        <li data-step="0">Start at shack (S)</li>
-        <li data-step="1">Walk ring road clockwise (or full circle)</li>
-        <li data-step="2">Visit SW legendary (dragon / beasts)</li>
-        <li data-step="3">Visit NE spirit (ghost / ruins)</li>
-        <li data-step="4">Cross both bridges onto center platform</li>
-        <li data-step="5">Walk north road to fire-curse wall</li>
-        <li data-step="6">Return to shack</li>
-      </ol>
+        <button type="button" id="btn-reset">Reset timer</button>
     </div>
     <div id="touch" aria-hidden="true">
       <div id="touch-knob"></div>
     </div>
-    <div id="touch-hint">drag anywhere to move</div>
     <div id="pstats"></div>
     <div id="combat">
-      <button type="button" id="btn-attack">Attack</button>
-      <button type="button" id="btn-auto">Auto: ON</button>
       <button type="button" id="btn-boss">Boss test</button>
     </div>
     <canvas id="minimap" width="220" height="220"></canvas>
@@ -707,7 +680,7 @@ window.addEventListener("resize", () => {
 
 window.addEventListener("keydown", (e) => {
   keys[e.code] = true;
-  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
+  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) e.preventDefault();
 }, { passive: false });
 window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 
@@ -723,7 +696,7 @@ function padPointer(e) {
   touchVec.x = (dx / max) * s; touchVec.y = (dy / max) * s;
   setKnob(dx, dy);
 }
-const JOY_BLOCK = "button,a,input,select,textarea,label,#combat,#script,#hud,.panel";
+const JOY_BLOCK = "button,a,input,select,textarea,label,#combat,#minimap,.panel";
 window.addEventListener("pointerdown", (e) => {
   if (joyId !== null) return;
   if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -1259,7 +1232,7 @@ const TYPE_GAIN = {
 };
 const stats = { hp: 100, aspd: 1, dmg: 0, armor: 0, kills: 0 };
 const enemies = [];
-let autoAttack = true, attackTimer = 0, manualAttackQueued = false;
+let attackTimer = 0;
 const _v = new THREE.Vector3();
 
 function regEnemy(obj, type, opts = {}) {
@@ -1466,12 +1439,7 @@ function updateCombat(dt) {
   elapsedReal += dt;
   attackTimer -= dt;
   const period = ATTACK_PERIOD / stats.aspd;
-  if (manualAttackQueued || (autoAttack && attackTimer <= 0)) {
-    if (attackTimer <= 0 || manualAttackQueued) {
-      if (attackTimer <= 0) { doAttack(); attackTimer = period; }
-    }
-    manualAttackQueued = false;
-  }
+  if (attackTimer <= 0) { doAttack(); attackTimer = period; }
   for (const e of enemies) {
     if (e.state === "alive") {
       const show = e.hp < e.maxHp && elapsedReal - e.lastHit < 6;
@@ -1502,14 +1470,9 @@ const statsHudEl = document.getElementById("pstats");
 function updateStatsHud() {
   statsHudEl.textContent = `HP ${stats.hp} · DMG ${BASE_DMG + stats.dmg} · ASPD ${(stats.aspd * 100).toFixed(0)}% · ARM ${stats.armor} · kills ${stats.kills}`;
 }
-document.getElementById("btn-attack").addEventListener("pointerdown", (e) => { e.preventDefault(); manualAttackQueued = true; if (attackTimer <= 0) { doAttack(); attackTimer = ATTACK_PERIOD / stats.aspd; } });
-const btnAuto = document.getElementById("btn-auto");
-btnAuto.addEventListener("click", () => { autoAttack = !autoAttack; btnAuto.textContent = "Auto: " + (autoAttack ? "ON" : "OFF"); });
 document.getElementById("btn-boss").addEventListener("click", bossTest);
 window.addEventListener("keydown", (e) => {
-  if (e.code === "Space") { e.preventDefault(); if (attackTimer <= 0) { doAttack(); attackTimer = ATTACK_PERIOD / stats.aspd; } }
   if (e.code === "KeyB") bossTest();
-  if (e.code === "KeyT") { btnAuto.click(); }
 });
 updateStatsHud();
 window.__dw = { stats, enemies, bossTest, doAttack, spawnAbsorb, player, WALK_SPEED };

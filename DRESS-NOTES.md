@@ -101,3 +101,9 @@ Lean copies live under `graybox/models/` (~9 MB). Provenance packs remain under 
 ## Stone removal + floating joystick (2026-11-02)
 - **Cobblestone removed entirely**: stone patches, bridge-approach pads, and platform/rim stone texturing deleted; `models/textures/stone/` removed (and from CREDITS). Platform + rim keep geometry with plain untextured earthy MeshStandardMaterial (0x8a7a62 / 0x9a8a70). Grass + dirt unchanged.
 - **Floating joystick**: pointerdown anywhere (except buttons, `#combat`, `#script`, `.panel`) spawns the base at the touch point; drag moves knob (48 px full deflection); release hides it. Tracks a single pointerId, so a second finger can tap Attack. Works with mouse drag on desktop; keys unchanged. Faint "drag anywhere to move" hint bottom-center on coarse pointers.
+
+## UI cleanup (2026-11-02)
+- Bottom UI trimmed to stats line (bottom-left) + small Boss test button beneath it.
+- Removed Attack button, Auto toggle, walk-script panel, controls/"drag anywhere" hints; Space/T keybinds removed (B = boss test kept).
+- Attacking is always auto (range 2.5m, period 0.6s / aspd).
+- Minimap moved to bottom-right corner (safe-area aware); joystick ignores touches on minimap/Boss test.
