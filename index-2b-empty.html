@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Darkwood Forest — Circulation Graybox (2b)</title>
+  <style>
+    :root {
+      --bg: #1a1f16;
+      --panel: rgba(12, 16, 10, 0.88);
+      --text: #e8f0d8;
+      --muted: #a8b890;
+      --accent: #c8e08a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #game {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #12160f;
+    }
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #hud .panel {
+      pointer-events: auto;
+      background: var(--panel);
+      border: 1px solid rgba(200, 224, 138, 0.25);
+      border-radius: 10px;
+      padding: 10px 12px;
+      backdrop-filter: blur(6px);
+    }
+    #topbar {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    #stats {
+      flex: 1 1 180px;
+      min-width: 160px;
+    }
+    #stats .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    #stats .label { color: var(--muted); }
+    #stats .value { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent); }
+    #stats .landmark { color: #fff; font-weight: 600; }
+    #controls-hint {
+      flex: 0 1 220px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    #controls-hint strong { color: var(--text); }
+    #btn-reset {
+      pointer-events: auto;
+      border: 1px solid rgba(200, 224, 138, 0.4);
+      background: #2a3520;
+      color: var(--accent);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      align-self: flex-start;
+    }
+    #btn-reset:active { background: #3a4a2c; }
+    #script {
+      position: absolute;
+      bottom: 12px;
+      left: 10px;
+      right: 10px;
+      max-width: 520px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+    #script h3 {
+      font-size: 12px;
+      color: var(--accent);
+      margin-bottom: 4px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    #script ol { margin-left: 18px; }
+    #script li.done { color: #7ec87e; text-decoration: line-through; }
+    #script li.current { color: #fff; font-weight: 600; }
+    #touch {
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      width: 120px;
+      height: 120px;
+      pointer-events: auto;
+      display: none;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+    #touch-knob {
+      position: absolute;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(200, 224, 138, 0.45);
+      border: 1px solid rgba(200, 224, 138, 0.7);
+      left: 36px;
+      top: 36px;
+    }
+    @media (pointer: coarse) {
+      #touch { display: block; }
+      #script { right: 150px; max-width: 360px; }
+    }
+    #title {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(232, 240, 216, 0.55);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="hud">
+    <div id="title">The Darkwood Forest — Circulation Graybox (2b)</div>
+    <div id="topbar">
+      <div class="panel" id="stats">
+        <div class="row"><span class="label">Elapsed</span><span class="value" id="timer">0.0s</span></div>
+        <div class="row"><span class="label">Nearest</span><span class="landmark" id="nearest">—</span></div>
+        <div class="row"><span class="label">N–S tip</span><span class="value" id="crosshint">~50s target</span></div>
+      </div>
+      <div class="panel" id="controls-hint">
+        <strong>Controls</strong><br />
+        Move: WASD / Arrows<br />
+        Phone: drag right pad<br />
+        Reset timer: button →
+      </div>
+      <button type="button" id="btn-reset">Reset timer</button>
+    </div>
+    <div class="panel" id="script">
+      <h3>Fixed walk script</h3>
+      <ol id="script-list">
+        <li data-step="0">Start at shack (S)</li>
+        <li data-step="1">Walk ring road clockwise (or full circle)</li>
+        <li data-step="2">Visit SW legendary marker</li>
+        <li data-step="3">Visit NE spirit marker</li>
+        <li data-step="4">Cross both bridges onto center platform</li>
+        <li data-step="5">Walk north road to fire-curse wall</li>
+        <li data-step="6">Return to shack</li>
+      </ol>
+    </div>
+    <div id="touch" aria-hidden="true">
+      <div id="touch-knob"></div>
+    </div>
+  </div>
+  <script>
+(function () {
+  "use strict";
+
+  // Tunables: WORLD / WALK_SPEED ≈ N–S empty cross time (target 45–60s)
+  const WORLD = 220;
+  const HALF = WORLD / 2;
+  const LAKE_R = 28;
+  const RING_R = 42;
+  const ROAD_W = 7;
+  const CARDINAL_HALF_W = 5.5;
+  const PLATFORM_R = 14;
+  const PLATFORM_STEP = 1.2;
+  const BRIDGE_W = 6;
+  const WALL_THICK = 4;
+  const WALL_Y = HALF - 6;
+  const WALK_SPEED = 3.85; // 220 / 3.85 ≈ 57.1s N–S
+  const PLAYER_R = 1.15;
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const timerEl = document.getElementById("timer");
+  const nearestEl = document.getElementById("nearest");
+  const crossHintEl = document.getElementById("crosshint");
+  const btnReset = document.getElementById("btn-reset");
+  const scriptItems = Array.prototype.slice.call(document.querySelectorAll("#script-list li"));
+  const touchPad = document.getElementById("touch");
+  const touchKnob = document.getElementById("touch-knob");
+
+  crossHintEl.textContent = (WORLD / WALK_SPEED).toFixed(0) + "s N–S @ walk";
+
+  const landmarks = [
+    { id: "shack", label: "Shack / Spawn", x: 0, y: HALF - 10, r: 8 },
+    { id: "legendary", label: "Legendary", x: -HALF * 0.62, y: HALF * 0.55, r: 8 },
+    { id: "spirit", label: "Dark spirit", x: HALF * 0.58, y: -HALF * 0.52, r: 8 },
+    { id: "boss", label: "Bandit boss", x: 0, y: 0, r: PLATFORM_R + 2 },
+    { id: "wall", label: "Fire-curse wall (exit stub)", x: 0, y: WALL_Y - 2, r: 10 }
+  ];
+
+  const progress = {
+    ringLap: false,
+    visitedLegendary: false,
+    visitedSpirit: false,
+    bridgeE: false,
+    bridgeW: false,
+    onPlatform: false,
+    hitWall: false,
+    returned: false
+  };
+  let ringAngleAccum = 0;
+  let lastRingAngle = null;
+
+  const keys = Object.create(null);
+  let touchVec = { x: 0, y: 0 };
+  let touchActive = false;
+
+  const player = { x: 0, y: HALF - 10, onPlatform: false };
+
+  let elapsed = 0;
+  let lastTs = 0;
+  let dpr = 1;
+  let viewW = 0;
+  let viewH = 0;
+  let camScale = 1;
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    viewW = window.innerWidth;
+    viewH = window.innerHeight;
+    canvas.width = Math.floor(viewW * dpr);
+    canvas.height = Math.floor(viewH * dpr);
+    canvas.style.width = viewW + "px";
+    canvas.style.height = viewH + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    camScale = Math.min(viewW, viewH) / 58;
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  window.addEventListener("keydown", function (e) {
+    keys[e.code] = true;
+    if (e.code === "ArrowUp" || e.code === "ArrowDown" || e.code === "ArrowLeft" || e.code === "ArrowRight" || e.code === "Space") {
+      e.preventDefault();
+    }
+  }, { passive: false });
+  window.addEventListener("keyup", function (e) { keys[e.code] = false; });
+
+  function setKnob(dx, dy) {
+    var max = 36;
+    var len = Math.hypot(dx, dy) || 1;
+    var c = Math.min(1, max / len);
+    touchKnob.style.transform = "translate(" + (dx * c) + "px, " + (dy * c) + "px)";
+  }
+  function padPointer(e) {
+    var rect = touchPad.getBoundingClientRect();
+    var dx = e.clientX - (rect.left + rect.width / 2);
+    var dy = e.clientY - (rect.top + rect.height / 2);
+    var max = 48;
+    var len = Math.hypot(dx, dy) || 1;
+    var s = Math.min(1, max / len);
+    touchVec.x = (dx / max) * s;
+    touchVec.y = (dy / max) * s;
+    setKnob(dx, dy);
+  }
+  touchPad.addEventListener("pointerdown", function (e) {
+    touchActive = true;
+    touchPad.setPointerCapture(e.pointerId);
+    padPointer(e);
+  });
+  touchPad.addEventListener("pointermove", function (e) {
+    if (!touchActive) return;
+    padPointer(e);
+  });
+  function endTouch() {
+    touchActive = false;
+    touchVec.x = 0;
+    touchVec.y = 0;
+    setKnob(0, 0);
+  }
+  touchPad.addEventListener("pointerup", endTouch);
+  touchPad.addEventListener("pointercancel", endTouch);
+
+  btnReset.addEventListener("click", function () {
+    elapsed = 0;
+    timerEl.textContent = "0.0s";
+  });
+
+  function inLake(x, y) { return x * x + y * y < LAKE_R * LAKE_R; }
+  function inPlatform(x, y) { return x * x + y * y <= PLATFORM_R * PLATFORM_R; }
+  function onBridge(x, y) {
+    var e = Math.abs(y) <= BRIDGE_W / 2 && x >= PLATFORM_R - 1 && x <= RING_R + 1;
+    var w = Math.abs(y) <= BRIDGE_W / 2 && x <= -(PLATFORM_R - 1) && x >= -(RING_R + 1);
+    return { e: e, w: w, any: e || w };
+  }
+  function inRingRoad(x, y) {
+    var d = Math.hypot(x, y);
+    return Math.abs(d - RING_R) <= ROAD_W / 2 + 0.5;
+  }
+  function hitNorthWall(x, y) {
+    return y >= WALL_Y - WALL_THICK / 2 &&
+           y <= WALL_Y + WALL_THICK / 2 + 2 &&
+           Math.abs(x) <= HALF - 4;
+  }
+  function outOfBounds(x, y) {
+    return Math.abs(x) > HALF - 1.5 || Math.abs(y) > HALF - 1.5;
+  }
+  function blocked(x, y) {
+    if (outOfBounds(x, y)) return true;
+    if (hitNorthWall(x, y)) return true;
+    var br = onBridge(x, y);
+    if (inPlatform(x, y) || br.any) return false;
+    if (inLake(x, y)) return true;
+    return false;
+  }
+
+  function tryMove(nx, ny) {
+    var x = player.x;
+    var y = player.y;
+    if (!blocked(nx, y)) x = nx;
+    if (!blocked(x, ny)) y = ny;
+    var samples = [
+      [PLAYER_R, 0], [-PLAYER_R, 0], [0, PLAYER_R], [0, -PLAYER_R],
+      [PLAYER_R * 0.7, PLAYER_R * 0.7], [-PLAYER_R * 0.7, PLAYER_R * 0.7],
+      [PLAYER_R * 0.7, -PLAYER_R * 0.7], [-PLAYER_R * 0.7, -PLAYER_R * 0.7]
+    ];
+    for (var i = 0; i < samples.length; i++) {
+      var ox = samples[i][0];
+      var oy = samples[i][1];
+      if (blocked(x + ox, y + oy)) {
+        if (blocked(player.x + ox, y + oy)) y = player.y;
+        if (blocked(x + ox, player.y + oy)) x = player.x;
+      }
+    }
+    player.x = x;
+    player.y = y;
+    player.onPlatform = inPlatform(x, y);
+  }
+
+  function inputDir() {
+    var ix = 0, iy = 0;
+    if (keys.KeyW || keys.ArrowUp) iy -= 1;
+    if (keys.KeyS || keys.ArrowDown) iy += 1;
+    if (keys.KeyA || keys.ArrowLeft) ix -= 1;
+    if (keys.KeyD || keys.ArrowRight) ix += 1;
+    ix += touchVec.x;
+    iy += touchVec.y;
+    var len = Math.hypot(ix, iy);
+    if (len > 1e-3) {
+      var c = Math.min(1, len);
+      return { x: (ix / len) * c, y: (iy / len) * c };
+    }
+    return { x: 0, y: 0 };
+  }
+
+  function nearestLandmark() {
+    var best = landmarks[0];
+    var bestD = Infinity;
+    for (var i = 0; i < landmarks.length; i++) {
+      var lm = landmarks[i];
+      var d = Math.hypot(player.x - lm.x, player.y - lm.y);
+      if (d < bestD) { bestD = d; best = lm; }
+    }
+    return best;
+  }
+
+  function updateProgress() {
+    var dLeg = Math.hypot(player.x - landmarks[1].x, player.y - landmarks[1].y);
+    var dSpi = Math.hypot(player.x - landmarks[2].x, player.y - landmarks[2].y);
+    var dSha = Math.hypot(player.x - landmarks[0].x, player.y - landmarks[0].y);
+    if (dLeg < landmarks[1].r) progress.visitedLegendary = true;
+    if (dSpi < landmarks[2].r) progress.visitedSpirit = true;
+
+    var br = onBridge(player.x, player.y);
+    if (br.e) progress.bridgeE = true;
+    if (br.w) progress.bridgeW = true;
+    if (player.onPlatform) progress.onPlatform = true;
+
+    var ang = Math.atan2(player.y, player.x);
+    if (inRingRoad(player.x, player.y)) {
+      if (lastRingAngle !== null) {
+        var d = ang - lastRingAngle;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        ringAngleAccum += d;
+        if (Math.abs(ringAngleAccum) >= Math.PI * 1.7) progress.ringLap = true;
+      }
+      lastRingAngle = ang;
+    } else {
+      lastRingAngle = null;
+    }
+
+    if (player.y > WALL_Y - WALL_THICK - 3 && Math.abs(player.x) < 14) {
+      progress.hitWall = true;
+    }
+
+    if (
+      progress.visitedLegendary &&
+      progress.visitedSpirit &&
+      progress.bridgeE &&
+      progress.bridgeW &&
+      progress.onPlatform &&
+      progress.hitWall &&
+      dSha < landmarks[0].r
+    ) {
+      progress.returned = true;
+    }
+
+    var steps = [
+      true,
+      progress.ringLap,
+      progress.visitedLegendary,
+      progress.visitedSpirit,
+      progress.bridgeE && progress.bridgeW && progress.onPlatform,
+      progress.hitWall,
+      progress.returned
+    ];
+    var current = 0;
+    for (var i = 0; i < steps.length; i++) {
+      if (!steps[i]) { current = i; break; }
+      current = i;
+    }
+    for (var j = 0; j < scriptItems.length; j++) {
+      scriptItems[j].classList.remove("done", "current");
+      if (progress.returned || (steps[j] && j !== current)) {
+        scriptItems[j].classList.add("done");
+      } else if (j === current) {
+        scriptItems[j].classList.add("current");
+      }
+    }
+    if (progress.returned) {
+      for (var k = 0; k < scriptItems.length; k++) {
+        scriptItems[k].classList.remove("current");
+        scriptItems[k].classList.add("done");
+      }
+    }
+  }
+
+  function worldToScreen(x, y) {
+    return {
+      x: viewW / 2 + (x - player.x) * camScale,
+      y: viewH / 2 + (y - player.y) * camScale
+    };
+  }
+
+  function fillCircle(x, y, r, color) {
+    var p = worldToScreen(x, y);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r * camScale, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  function strokeCircle(x, y, r, color, w) {
+    var p = worldToScreen(x, y);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r * camScale, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = (w || 1) * camScale;
+    ctx.stroke();
+  }
+
+  function fillRectWorld(x, y, w, h, color) {
+    var p = worldToScreen(x, y);
+    ctx.fillStyle = color;
+    ctx.fillRect(p.x, p.y, w * camScale, h * camScale);
+  }
+
+  function drawGround() {
+    var tl = worldToScreen(-HALF, -HALF);
+    ctx.fillStyle = "#2c3824";
+    ctx.fillRect(tl.x, tl.y, WORLD * camScale, WORLD * camScale);
+
+    // W denser woods
+    fillRectWorld(-HALF, -HALF, HALF - RING_R * 0.15, WORLD, "rgba(16, 34, 14, 0.48)");
+    // S denser
+    fillRectWorld(-HALF, RING_R * 0.25, WORLD, HALF - RING_R * 0.25, "rgba(14, 32, 12, 0.4)");
+    // E / NE fire-ash
+    fillRectWorld(RING_R * 0.1, -HALF, HALF - RING_R * 0.1, HALF + RING_R * 0.35, "rgba(70, 42, 22, 0.36)");
+    fillRectWorld(0, -HALF, HALF, HALF * 0.55, "rgba(90, 48, 28, 0.2)");
+
+    ctx.strokeStyle = "rgba(0,0,0,0.55)";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(tl.x, tl.y, WORLD * camScale, WORLD * camScale);
+  }
+
+  function drawRoads() {
+    strokeCircle(0, 0, RING_R, "#6b5438", ROAD_W);
+    strokeCircle(0, 0, RING_R - ROAD_W / 2, "rgba(40,30,18,0.45)", 0.3);
+    strokeCircle(0, 0, RING_R + ROAD_W / 2, "rgba(40,30,18,0.45)", 0.3);
+
+    var outer = HALF - 2;
+    var hw = CARDINAL_HALF_W;
+    var dirt = "#6b5438";
+    var spokeLen = outer - (RING_R - ROAD_W / 2);
+    // N
+    fillRectWorld(-hw, -outer, hw * 2, spokeLen, dirt);
+    // S
+    fillRectWorld(-hw, RING_R - ROAD_W / 2, hw * 2, spokeLen, dirt);
+    // E
+    fillRectWorld(RING_R - ROAD_W / 2, -hw, spokeLen, hw * 2, dirt);
+    // W
+    fillRectWorld(-outer, -hw, spokeLen, hw * 2, dirt);
+  }
+
+  function drawLakeAndBridges() {
+    fillCircle(0, 0, LAKE_R, "#2a4a62");
+    strokeCircle(0, 0, LAKE_R, "#1a3348", 0.6);
+    strokeCircle(0, 0, LAKE_R * 0.65, "rgba(180,210,230,0.12)", 0.4);
+    strokeCircle(0, 0, LAKE_R * 0.35, "rgba(180,210,230,0.1)", 0.35);
+
+    var wood = "#8a6a42";
+    var woodEdge = "#5a4428";
+    var len = RING_R - PLATFORM_R + 1.5;
+    fillRectWorld(PLATFORM_R - 0.5, -BRIDGE_W / 2, len, BRIDGE_W, wood);
+    fillRectWorld(PLATFORM_R - 0.5, -BRIDGE_W / 2, len, 0.35, woodEdge);
+    fillRectWorld(PLATFORM_R - 0.5, BRIDGE_W / 2 - 0.35, len, 0.35, woodEdge);
+    fillRectWorld(-(RING_R + 1), -BRIDGE_W / 2, len, BRIDGE_W, wood);
+    fillRectWorld(-(RING_R + 1), -BRIDGE_W / 2, len, 0.35, woodEdge);
+    fillRectWorld(-(RING_R + 1), BRIDGE_W / 2 - 0.35, len, 0.35, woodEdge);
+  }
+
+  function drawPlatform() {
+    fillCircle(0, 0, PLATFORM_R + PLATFORM_STEP, "#4a3a28");
+    fillCircle(0, 0, PLATFORM_R, "#5c4a32");
+    strokeCircle(0, 0, PLATFORM_R, "rgba(20,14,8,0.55)", 0.5);
+    strokeCircle(0, 0, PLATFORM_R - 0.8, "rgba(200,180,120,0.25)", 0.7);
+  }
+
+  function drawWall() {
+    var x0 = -HALF + 4;
+    var w = WORLD - 8;
+    fillRectWorld(x0, WALL_Y - WALL_THICK / 2, w, WALL_THICK, "#c45a28");
+    fillRectWorld(x0, WALL_Y - WALL_THICK / 2 - 1.2, w, 1.4, "#e87830");
+    fillRectWorld(x0, WALL_Y + WALL_THICK / 2 - 0.4, w, 1.2, "#6a2810");
+    for (var i = 0; i < 18; i++) {
+      var fx = x0 + 4 + i * (w / 18);
+      fillRectWorld(fx, WALL_Y - WALL_THICK / 2 - 2.5 - (i % 3) * 0.6, 1.2, 2.2, "#f0a040");
+    }
+  }
+
+  function drawLightBlockers() {
+    var trees = [
+      [-70, 30], [-78, 50], [-65, 70], [-85, 10], [-72, -20],
+      [-55, 85], [55, 75], [70, 60], [-40, 90], [35, 88],
+      [75, -40], [82, -15], [68, -70], [88, -55],
+      [-88, -40], [-75, -65], [20, 95], [-20, 92],
+      [-60, -80], [48, 40], [-90, 40]
+    ];
+    for (var i = 0; i < trees.length; i++) {
+      var tx = trees[i][0];
+      var ty = trees[i][1];
+      if (inLake(tx, ty) || inPlatform(tx, ty)) continue;
+      var d = Math.hypot(tx, ty);
+      if (Math.abs(d - RING_R) < ROAD_W) continue;
+      if (Math.abs(tx) < CARDINAL_HALF_W + 2 && Math.abs(ty) > RING_R - 4) continue;
+      if (Math.abs(ty) < CARDINAL_HALF_W + 2 && Math.abs(tx) > RING_R - 4) continue;
+      fillCircle(tx, ty, 2.2, "#1e2a18");
+      fillCircle(tx, ty, 1.2, "#2a3c22");
+    }
+  }
+
+  function drawLabel(x, y, text, color) {
+    var p = worldToScreen(x, y);
+    ctx.font = "600 " + Math.max(11, 12 * (camScale / 14)) + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    var pad = 4;
+    var tw = ctx.measureText(text).width;
+    ctx.fillStyle = "rgba(8,10,6,0.72)";
+    ctx.fillRect(p.x - tw / 2 - pad, p.y - 16 - pad, tw + pad * 2, 16 + pad);
+    ctx.fillStyle = color || "#f2f6e8";
+    ctx.fillText(text, p.x, p.y - 4);
+  }
+
+  function drawMarkers() {
+    fillRectWorld(-3, HALF - 13, 6, 5, "#7a6040");
+    fillRectWorld(-3.5, HALF - 13.5, 7, 1.2, "#5a4030");
+    drawLabel(0, HALF - 14, "Shack / Spawn", "#d8e8a8");
+
+    fillCircle(landmarks[1].x, landmarks[1].y, 3.2, "#6a4a18");
+    strokeCircle(landmarks[1].x, landmarks[1].y, 3.2, "#e8c060", 0.4);
+    drawLabel(landmarks[1].x, landmarks[1].y - 4, "Legendary", "#f0d080");
+
+    fillCircle(landmarks[2].x, landmarks[2].y, 3.2, "#3a2858");
+    strokeCircle(landmarks[2].x, landmarks[2].y, 3.2, "#a898e8", 0.4);
+    drawLabel(landmarks[2].x, landmarks[2].y - 4, "Dark spirit", "#c8b8f0");
+
+    fillCircle(0, 0, 2.6, "#5a2820");
+    strokeCircle(0, 0, 2.6, "#e08060", 0.4);
+    drawLabel(0, -PLATFORM_R + 2, "Bandit boss", "#f0a888");
+
+    drawLabel(0, WALL_Y - 5, "Fire-curse wall (exit stub)", "#ffb070");
+
+    drawLabel(0, -RING_R - 6, "N road", "rgba(220,220,200,0.55)");
+    drawLabel(0, RING_R + 8, "S road", "rgba(220,220,200,0.55)");
+    drawLabel(RING_R + 10, 0, "E", "rgba(220,220,200,0.45)");
+    drawLabel(-(RING_R + 10), 0, "W", "rgba(220,220,200,0.45)");
+  }
+
+  function drawPlayer() {
+    var p = worldToScreen(player.x, player.y);
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + 1.2 * camScale, 1.3 * camScale, 0.7 * camScale, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, PLAYER_R * camScale, 0, Math.PI * 2);
+    ctx.fillStyle = player.onPlatform ? "#e8e070" : "#e8f0c0";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#1a2010";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - PLAYER_R * camScale * 0.55, 0.35 * camScale, 0, Math.PI * 2);
+    ctx.fillStyle = "#2a3018";
+    ctx.fill();
+  }
+
+  function drawMinimap() {
+    var size = Math.min(110, viewW * 0.22);
+    var pad = 10;
+    var coarse = window.matchMedia("(pointer: coarse)").matches;
+    var ox = viewW - size - pad;
+    var oy = viewH - size - pad - (coarse ? 130 : 0);
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = "rgba(10,14,8,0.75)";
+    ctx.strokeStyle = "rgba(200,224,138,0.35)";
+    ctx.lineWidth = 1;
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(ox, oy, size, size, 8);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillRect(ox, oy, size, size);
+      ctx.strokeRect(ox, oy, size, size);
+    }
+    var s = size / WORLD;
+    var cx = ox + size / 2;
+    var cy = oy + size / 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, LAKE_R * s, 0, Math.PI * 2);
+    ctx.fillStyle = "#2a4a62";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, cy, RING_R * s, 0, Math.PI * 2);
+    ctx.strokeStyle = "#6b5438";
+    ctx.lineWidth = Math.max(1.5, ROAD_W * s);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, PLATFORM_R * s, 0, Math.PI * 2);
+    ctx.fillStyle = "#5c4a32";
+    ctx.fill();
+    ctx.fillStyle = "#c45a28";
+    ctx.fillRect(ox + 4, cy + WALL_Y * s - 1.5, size - 8, 3);
+    ctx.beginPath();
+    ctx.arc(cx + player.x * s, cy + player.y * s, 3, 0, Math.PI * 2);
+    ctx.fillStyle = "#e8f0c0";
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function frame(ts) {
+    if (!lastTs) lastTs = ts;
+    var dt = Math.min(0.05, (ts - lastTs) / 1000);
+    lastTs = ts;
+
+    var dir = inputDir();
+    if (Math.hypot(dir.x, dir.y) > 0) {
+      elapsed += dt;
+      var speed = WALK_SPEED * (player.onPlatform ? 0.92 : 1);
+      tryMove(player.x + dir.x * speed * dt, player.y + dir.y * speed * dt);
+    }
+    timerEl.textContent = elapsed.toFixed(1) + "s";
+    nearestEl.textContent = nearestLandmark().label;
+    updateProgress();
+
+    ctx.clearRect(0, 0, viewW, viewH);
+    ctx.fillStyle = "#0c100a";
+    ctx.fillRect(0, 0, viewW, viewH);
+
+    drawGround();
+    drawRoads();
+    drawLakeAndBridges();
+    drawPlatform();
+    drawLightBlockers();
+    drawWall();
+    drawMarkers();
+    drawPlayer();
+    drawMinimap();
+
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+})();
+  </script>
+</body>
+</html>

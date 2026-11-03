@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" href="data:,">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Darkwood Forest — Dressed Graybox (feel pass)</title>
+  <style>
+    :root {
+      --bg: #1a1f16;
+      --panel: rgba(12, 16, 10, 0.88);
+      --text: #e8f0d8;
+      --muted: #a8b890;
+      --accent: #c8e08a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #game {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #0c100a;
+    }
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #hud .panel {
+      pointer-events: auto;
+      background: var(--panel);
+      border: 1px solid rgba(200, 224, 138, 0.25);
+      border-radius: 10px;
+      padding: 10px 12px;
+      backdrop-filter: blur(6px);
+    }
+    #topbar {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    #stats { flex: 1 1 180px; min-width: 160px; }
+    #stats .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    #stats .label { color: var(--muted); }
+    #stats .value { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent); }
+    #stats .landmark { color: #fff; font-weight: 600; }
+    #controls-hint {
+      flex: 0 1 240px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    #controls-hint strong { color: var(--text); }
+    #btn-reset {
+      pointer-events: auto;
+      border: 1px solid rgba(200, 224, 138, 0.4);
+      background: #2a3520;
+      color: var(--accent);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      align-self: flex-start;
+    }
+    #btn-reset:active { background: #3a4a2c; }
+    #script {
+      position: absolute;
+      bottom: 12px;
+      left: 10px;
+      right: 10px;
+      max-width: 520px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+    #script h3 {
+      font-size: 12px;
+      color: var(--accent);
+      margin-bottom: 4px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    #script ol { margin-left: 18px; }
+    #script li.done { color: #7ec87e; text-decoration: line-through; }
+    #script li.current { color: #fff; font-weight: 600; }
+    #touch {
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      width: 120px;
+      height: 120px;
+      pointer-events: auto;
+      display: none;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+    #touch-knob {
+      position: absolute;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(200, 224, 138, 0.45);
+      border: 1px solid rgba(200, 224, 138, 0.7);
+      left: 36px;
+      top: 36px;
+    }
+    @media (pointer: coarse) {
+      #touch { display: block; }
+      #script { right: 150px; max-width: 360px; }
+    }
+    #title {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(232, 240, 216, 0.55);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    #load {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0c100a;
+      color: var(--accent);
+      font-size: 14px;
+      letter-spacing: 0.04em;
+    }
+    #load.hide { display: none; }
+    .label3d {
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(8,10,6,0.78);
+      border: 1px solid rgba(200,224,138,0.28);
+      color: #f2f6e8;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      transform: translate(-50%, -100%);
+      pointer-events: none;
+      user-select: none;
+    }
+    #minimap {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      width: 110px;
+      height: 110px;
+      border-radius: 8px;
+      border: 1px solid rgba(200,224,138,0.35);
+      background: rgba(10,14,8,0.75);
+      pointer-events: none;
+    }
+    @media (pointer: coarse) {
+      #minimap { bottom: 148px; }
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="load">Loading Darkwood dress…</div>
+  <canvas id="game"></canvas>
+  <div id="hud">
+    <div id="title">The Darkwood Forest — Dressed Graybox (feel)</div>
+    <div id="topbar">
+      <div class="panel" id="stats">
+        <div class="row"><span class="label">Elapsed</span><span class="value" id="timer">0.0s</span></div>
+        <div class="row"><span class="label">Nearest</span><span class="landmark" id="nearest">—</span></div>
+        <div class="row"><span class="label">N–S tip</span><span class="value" id="crosshint">~50s target</span></div>
+      </div>
+      <div class="panel" id="controls-hint">
+        <strong>Controls</strong><br />
+        Move: WASD / Arrows<br />
+        Phone: drag right pad<br />
+        Camera: overhead isometric<br />
+        Reset timer: button →
+      </div>
+      <button type="button" id="btn-reset">Reset timer</button>
+    </div>
+    <div class="panel" id="script">
+      <h3>Fixed walk script</h3>
+      <ol id="script-list">
+        <li data-step="0">Start at shack (S)</li>
+        <li data-step="1">Walk ring road clockwise (or full circle)</li>
+        <li data-step="2">Visit SW legendary (dragon / beasts)</li>
+        <li data-step="3">Visit NE spirit (ghost / ruins)</li>
+        <li data-step="4">Cross both bridges onto center platform</li>
+        <li data-step="5">Walk north road to fire-curse wall</li>
+        <li data-step="6">Return to shack</li>
+      </ol>
+    </div>
+    <div id="touch" aria-hidden="true">
+      <div id="touch-knob"></div>
+    </div>
+    <canvas id="minimap" width="220" height="220"></canvas>
+  </div>
+  <script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
+import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+
+const WORLD = 220;
+const HALF = WORLD / 2;
+const LAKE_R = 28;
+const RING_R = 42;
+const ROAD_W = 7;
+const CARDINAL_HALF_W = 5.5;
+const PLATFORM_R = 14;
+const BRIDGE_W = 6;
+const WALL_THICK = 4;
+// Design lock: north fire wall. World +Y = south (same as 2b). North = -Y.
+const WALL_Y = -(HALF - 6);
+const WALK_SPEED = 3.85;
+const PLAYER_R = 1.15;
+
+const canvas = document.getElementById("game");
+const timerEl = document.getElementById("timer");
+const nearestEl = document.getElementById("nearest");
+const crossHintEl = document.getElementById("crosshint");
+const btnReset = document.getElementById("btn-reset");
+const scriptItems = [...document.querySelectorAll("#script-list li")];
+const touchPad = document.getElementById("touch");
+const touchKnob = document.getElementById("touch-knob");
+const loadEl = document.getElementById("load");
+const minimap = document.getElementById("minimap");
+const mctx = minimap.getContext("2d");
+
+crossHintEl.textContent = (WORLD / WALK_SPEED).toFixed(0) + "s N–S @ walk";
+
+const landmarks = [
+  { id: "shack", label: "Shack / Spawn", x: 0, y: HALF - 10, r: 8 },
+  { id: "legendary", label: "Legendary", x: -HALF * 0.62, y: HALF * 0.55, r: 10 },
+  { id: "spirit", label: "Dark spirit", x: HALF * 0.58, y: -HALF * 0.52, r: 10 },
+  { id: "boss", label: "Bandit boss", x: 0, y: 0, r: PLATFORM_R + 2 },
+  { id: "wall", label: "Fire-curse wall (exit stub)", x: 0, y: WALL_Y + 2, r: 12 }
+];
+
+const progress = {
+  ringLap: false, visitedLegendary: false, visitedSpirit: false,
+  bridgeE: false, bridgeW: false, onPlatform: false, hitWall: false, returned: false
+};
+let ringAngleAccum = 0;
+let lastRingAngle = null;
+
+const keys = Object.create(null);
+let touchVec = { x: 0, y: 0 };
+let touchActive = false;
+const player = { x: 0, y: HALF - 10, onPlatform: false, facing: 0 };
+let elapsed = 0;
+let lastTs = 0;
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(window.innerWidth, window.innerHeight);
+labelRenderer.domElement.style.position = "fixed";
+labelRenderer.domElement.style.inset = "0";
+labelRenderer.domElement.style.pointerEvents = "none";
+labelRenderer.domElement.style.zIndex = "5";
+document.body.appendChild(labelRenderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0c100a);
+scene.fog = new THREE.FogExp2(0x1a2214, 0.012);
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.5, 320);
+const camOffset = new THREE.Vector3(28, 38, 28); // overhead isometric-ish
+
+const hemi = new THREE.HemisphereLight(0xc8d8a8, 0x2a1a10, 0.85);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffe2b0, 1.15);
+sun.position.set(40, 70, 20);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 10;
+sun.shadow.camera.far = 220;
+sun.shadow.camera.left = -90;
+sun.shadow.camera.right = 90;
+sun.shadow.camera.top = 90;
+sun.shadow.camera.bottom = -90;
+scene.add(sun);
+
+const fireLight = new THREE.PointLight(0xff6622, 2.2, 55, 2);
+fireLight.position.set(0, 6, WALL_Y);
+scene.add(fireLight);
+const spiritLight = new THREE.PointLight(0x8866ff, 1.4, 28, 2);
+spiritLight.position.set(landmarks[2].x, 5, landmarks[2].y);
+scene.add(spiritLight);
+
+function mulberry32(a) {
+  return function () {
+    let t = (a += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(0xda24);
+
+function makeLabel(text, color) {
+  const el = document.createElement("div");
+  el.className = "label3d";
+  el.textContent = text;
+  if (color) el.style.color = color;
+  return new CSS2DObject(el);
+}
+
+function addGround() {
+  const geo = new THREE.PlaneGeometry(WORLD, WORLD, 40, 40);
+  geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    let r = 0.22, g = 0.30, b = 0.16;
+    if (x < -RING_R * 0.2) { r *= 0.7; g *= 1.05; b *= 0.75; } // denser W
+    if (z > RING_R * 0.2) { r *= 0.75; g *= 1.0; b *= 0.7; } // denser S
+    if (x > RING_R * 0.15 && z < 0) { r = 0.32; g = 0.20; b = 0.12; } // E/NE ash
+    if (z < -HALF * 0.55) { r = 0.38; g = 0.18; b = 0.10; } // near fire wall
+    colors[i * 3] = r; colors[i * 3 + 1] = g; colors[i * 3 + 2] = b;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+
+  // soft border
+  const edge = new THREE.Mesh(
+    new THREE.BoxGeometry(WORLD + 2, 2, WORLD + 2),
+    new THREE.MeshStandardMaterial({ color: 0x0a0e08, roughness: true, opacity: 0.0 })
+  );
+  edge.position.y = -1.2;
+  scene.add(edge);
+}
+
+function ringRoadMesh() {
+  const shape = new THREE.Shape();
+  const outer = RING_R + ROAD_W / 2;
+  const inner = RING_R - ROAD_W / 2;
+  shape.absarc(0, 0, outer, 0, Math.PI * 2, false);
+  const hole = new THREE.Path();
+  hole.absarc(0, 0, inner, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+  const geo = new THREE.ShapeGeometry(shape, 64);
+  geo.rotateX(-Math.PI / 2);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x6b5438, roughness: 0.92 }));
+  mesh.position.y = 0.04;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+}
+
+function cardinalRoads() {
+  const mat = new THREE.MeshStandardMaterial({ color: 0x6b5438, roughness: 0.92 });
+  const outer = HALF - 2;
+  const spokeLen = outer - (RING_R - ROAD_W / 2);
+  const hw = CARDINAL_HALF_W;
+  const places = [
+    [0, -(RING_R + spokeLen / 2 - ROAD_W / 4), hw * 2, spokeLen], // N (-Z)
+    [0, RING_R + spokeLen / 2 - ROAD_W / 4, hw * 2, spokeLen], // S
+    [RING_R + spokeLen / 2 - ROAD_W / 4, 0, spokeLen, hw * 2], // E
+    [-(RING_R + spokeLen / 2 - ROAD_W / 4), 0, spokeLen, hw * 2] // W
+  ];
+  for (const [x, z, w, d] of places) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, d), mat);
+    m.position.set(x, 0.04, z);
+    m.receiveShadow = true;
+    scene.add(m);
+  }
+}
+
+function lakeAndPlatform() {
+  const water = new THREE.Mesh(
+    new THREE.CircleGeometry(LAKE_R, 48),
+    new THREE.MeshStandardMaterial({ color: 0x2a4a62, roughness: 0.35, metalness: 0.15 })
+  );
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = 0.02;
+  scene.add(water);
+
+  const plat = new THREE.Mesh(
+    new THREE.CylinderGeometry(PLATFORM_R, PLATFORM_R + 0.8, 1.4, 32),
+    new THREE.MeshStandardMaterial({ color: 0x5c4a32, roughness: 0.88 })
+  );
+  plat.position.y = 0.7;
+  plat.castShadow = true;
+  plat.receiveShadow = true;
+  scene.add(plat);
+
+  const rim = new THREE.Mesh(
+    new THREE.TorusGeometry(PLATFORM_R - 0.6, 0.18, 8, 40),
+    new THREE.MeshStandardMaterial({ color: 0xc8b478, roughness: 0.7 })
+  );
+  rim.rotation.x = Math.PI / 2;
+  rim.position.y = 1.45;
+  scene.add(rim);
+}
+
+function fireWall() {
+  const group = new THREE.Group();
+  const w = WORLD - 8;
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(w, 3.2, WALL_THICK),
+    new THREE.MeshStandardMaterial({ color: 0xc45a28, emissive: 0x882200, emissiveIntensity: 0.45, roughness: 0.7 })
+  );
+  base.position.set(0, 1.6, WALL_Y);
+  group.add(base);
+  const top = new THREE.Mesh(
+    new THREE.BoxGeometry(w, 1.2, WALL_THICK * 0.7),
+    new THREE.MeshStandardMaterial({ color: 0xe87830, emissive: 0xff4400, emissiveIntensity: 0.7, roughness: 0.55 })
+  );
+  top.position.set(0, 3.5, WALL_Y);
+  group.add(top);
+  for (let i = 0; i < 22; i++) {
+    const fx = -w / 2 + 4 + i * (w / 22);
+    const flame = new THREE.Mesh(
+      new THREE.ConeGeometry(0.7 + (i % 3) * 0.15, 2.2 + (i % 4) * 0.35, 5),
+      new THREE.MeshStandardMaterial({
+        color: 0xffaa40, emissive: 0xff6600, emissiveIntensity: 1.2, transparent: true, opacity: 0.85
+      })
+    );
+    flame.position.set(fx, 4.6 + (i % 3) * 0.3, WALL_Y);
+    group.add(flame);
+  }
+  scene.add(group);
+  const lab = makeLabel("Fire-curse wall (exit stub)", "#ffb070");
+  lab.position.set(0, 6.5, WALL_Y);
+  scene.add(lab);
+}
+
+function inLake(x, y) { return x * x + y * y < LAKE_R * LAKE_R; }
+function inPlatform(x, y) { return x * x + y * y <= PLATFORM_R * PLATFORM_R; }
+function onBridge(x, y) {
+  const e = Math.abs(y) <= BRIDGE_W / 2 && x >= PLATFORM_R - 1 && x <= RING_R + 1;
+  const w = Math.abs(y) <= BRIDGE_W / 2 && x <= -(PLATFORM_R - 1) && x >= -(RING_R + 1);
+  return { e, w, any: e || w };
+}
+function inRingRoad(x, y) {
+  const d = Math.hypot(x, y);
+  return Math.abs(d - RING_R) <= ROAD_W / 2 + 0.5;
+}
+function hitNorthWall(x, y) {
+  return y <= WALL_Y + WALL_THICK / 2 &&
+         y >= WALL_Y - WALL_THICK / 2 - 2 &&
+         Math.abs(x) <= HALF - 4;
+}
+function outOfBounds(x, y) {
+  return Math.abs(x) > HALF - 1.5 || Math.abs(y) > HALF - 1.5;
+}
+function blocked(x, y) {
+  if (outOfBounds(x, y)) return true;
+  if (hitNorthWall(x, y)) return true;
+  const br = onBridge(x, y);
+  if (inPlatform(x, y) || br.any) return false;
+  if (inLake(x, y)) return true;
+  return false;
+}
+function tryMove(nx, ny) {
+  let x = player.x, y = player.y;
+  if (!blocked(nx, y)) x = nx;
+  if (!blocked(x, ny)) y = ny;
+  const samples = [
+    [PLAYER_R, 0], [-PLAYER_R, 0], [0, PLAYER_R], [0, -PLAYER_R],
+    [PLAYER_R * 0.7, PLAYER_R * 0.7], [-PLAYER_R * 0.7, PLAYER_R * 0.7],
+    [PLAYER_R * 0.7, -PLAYER_R * 0.7], [-PLAYER_R * 0.7, -PLAYER_R * 0.7]
+  ];
+  for (const [ox, oy] of samples) {
+    if (blocked(x + ox, y + oy)) {
+      if (blocked(player.x + ox, y + oy)) y = player.y;
+      if (blocked(x + ox, player.y + oy)) x = player.x;
+    }
+  }
+  player.x = x; player.y = y;
+  player.onPlatform = inPlatform(x, y);
+}
+
+function inputDir() {
+  let ix = 0, iy = 0;
+  if (keys.KeyW || keys.ArrowUp) iy -= 1;
+  if (keys.KeyS || keys.ArrowDown) iy += 1;
+  if (keys.KeyA || keys.ArrowLeft) ix -= 1;
+  if (keys.KeyD || keys.ArrowRight) ix += 1;
+  ix += touchVec.x; iy += touchVec.y;
+  const len = Math.hypot(ix, iy);
+  if (len > 1e-3) {
+    const c = Math.min(1, len);
+    return { x: (ix / len) * c, y: (iy / len) * c };
+  }
+  return { x: 0, y: 0 };
+}
+
+function nearestLandmark() {
+  let best = landmarks[0], bestD = Infinity;
+  for (const lm of landmarks) {
+    const d = Math.hypot(player.x - lm.x, player.y - lm.y);
+    if (d < bestD) { bestD = d; best = lm; }
+  }
+  return best;
+}
+
+function updateProgress() {
+  const dLeg = Math.hypot(player.x - landmarks[1].x, player.y - landmarks[1].y);
+  const dSpi = Math.hypot(player.x - landmarks[2].x, player.y - landmarks[2].y);
+  const dSha = Math.hypot(player.x - landmarks[0].x, player.y - landmarks[0].y);
+  if (dLeg < landmarks[1].r) progress.visitedLegendary = true;
+  if (dSpi < landmarks[2].r) progress.visitedSpirit = true;
+  const br = onBridge(player.x, player.y);
+  if (br.e) progress.bridgeE = true;
+  if (br.w) progress.bridgeW = true;
+  if (player.onPlatform) progress.onPlatform = true;
+
+  const ang = Math.atan2(player.y, player.x);
+  if (inRingRoad(player.x, player.y)) {
+    if (lastRingAngle !== null) {
+      let d = ang - lastRingAngle;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      ringAngleAccum += d;
+      if (Math.abs(ringAngleAccum) >= Math.PI * 1.7) progress.ringLap = true;
+    }
+    lastRingAngle = ang;
+  } else lastRingAngle = null;
+
+  if (player.y < WALL_Y + WALL_THICK + 3 && Math.abs(player.x) < 14) progress.hitWall = true;
+
+  if (progress.visitedLegendary && progress.visitedSpirit && progress.bridgeE &&
+      progress.bridgeW && progress.onPlatform && progress.hitWall && dSha < landmarks[0].r) {
+    progress.returned = true;
+  }
+  const steps = [
+    true, progress.ringLap, progress.visitedLegendary, progress.visitedSpirit,
+    progress.bridgeE && progress.bridgeW && progress.onPlatform, progress.hitWall, progress.returned
+  ];
+  let current = 0;
+  for (let i = 0; i < steps.length; i++) {
+    if (!steps[i]) { current = i; break; }
+    current = i;
+  }
+  for (let j = 0; j < scriptItems.length; j++) {
+    scriptItems[j].classList.remove("done", "current");
+    if (progress.returned || (steps[j] && j !== current)) scriptItems[j].classList.add("done");
+    else if (j === current) scriptItems[j].classList.add("current");
+  }
+  if (progress.returned) {
+    for (const li of scriptItems) { li.classList.remove("current"); li.classList.add("done"); }
+  }
+}
+
+function drawMinimap() {
+  const size = 220;
+  mctx.clearRect(0, 0, size, size);
+  mctx.fillStyle = "rgba(10,14,8,0.75)";
+  mctx.fillRect(0, 0, size, size);
+  const s = size / WORLD;
+  const cx = size / 2, cy = size / 2;
+  mctx.beginPath(); mctx.arc(cx, cy, LAKE_R * s, 0, Math.PI * 2);
+  mctx.fillStyle = "#2a4a62"; mctx.fill();
+  mctx.beginPath(); mctx.arc(cx, cy, RING_R * s, 0, Math.PI * 2);
+  mctx.strokeStyle = "#6b5438"; mctx.lineWidth = Math.max(2, ROAD_W * s); mctx.stroke();
+  mctx.beginPath(); mctx.arc(cx, cy, PLATFORM_R * s, 0, Math.PI * 2);
+  mctx.fillStyle = "#5c4a32"; mctx.fill();
+  mctx.fillStyle = "#c45a28";
+  mctx.fillRect(4, cy + WALL_Y * s - 2, size - 8, 4);
+  mctx.beginPath();
+  mctx.arc(cx + player.x * s, cy + player.y * s, 4, 0, Math.PI * 2);
+  mctx.fillStyle = "#e8f0c0"; mctx.fill();
+}
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  labelRenderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+window.addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
+}, { passive: false });
+window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+
+function setKnob(dx, dy) {
+  const max = 36, len = Math.hypot(dx, dy) || 1, c = Math.min(1, max / len);
+  touchKnob.style.transform = `translate(${dx * c}px, ${dy * c}px)`;
+}
+function padPointer(e) {
+  const rect = touchPad.getBoundingClientRect();
+  const dx = e.clientX - (rect.left + rect.width / 2);
+  const dy = e.clientY - (rect.top + rect.height / 2);
+  const max = 48, len = Math.hypot(dx, dy) || 1, s = Math.min(1, max / len);
+  touchVec.x = (dx / max) * s; touchVec.y = (dy / max) * s;
+  setKnob(dx, dy);
+}
+touchPad.addEventListener("pointerdown", (e) => {
+  touchActive = true; touchPad.setPointerCapture(e.pointerId); padPointer(e);
+});
+touchPad.addEventListener("pointermove", (e) => { if (touchActive) padPointer(e); });
+function endTouch() { touchActive = false; touchVec.x = 0; touchVec.y = 0; setKnob(0, 0); }
+touchPad.addEventListener("pointerup", endTouch);
+touchPad.addEventListener("pointercancel", endTouch);
+btnReset.addEventListener("click", () => { elapsed = 0; timerEl.textContent = "0.0s"; });
+
+const loader = new GLTFLoader();
+const cache = new Map();
+function prep(root) {
+  root.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = true;
+      o.receiveShadow = true;
+      if (o.material) {
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of mats) {
+          if (m.map) m.map.colorSpace = THREE.SRGBColorSpace;
+        }
+      }
+    }
+  });
+  return root;
+}
+async function ensureModel(url) {
+  if (cache.has(url)) return cache.get(url);
+  const gltf = await loader.loadAsync(url);
+  prep(gltf.scene);
+  gltf.scene.userData.clips = gltf.animations || [];
+  cache.set(url, gltf.scene);
+  return gltf.scene;
+}
+function cloneModel(url) {
+  const src = cache.get(url);
+  if (!src) throw new Error("Model not preloaded: " + url);
+  const c = prep(SkeletonUtils.clone(src));
+  c.userData.clips = src.userData.clips;
+  return c;
+}
+
+// ---- Animation (KayKit Character Animations Rig_Medium + Quaternius built-in clips) ----
+const mixers = [];
+let rigClips = [];
+async function loadRigClips() {
+  const urls = ["models/anim/Rig_Medium_General.glb", "models/anim/Rig_Medium_MovementBasic.glb"];
+  const res = await Promise.all(urls.map((u) => loader.loadAsync(u).catch((e) => { console.warn("anim load", u, e); return null; })));
+  rigClips = res.flatMap((g) => (g ? g.animations : []));
+}
+function findClip(clips, names) {
+  for (const n of names) {
+    const c = clips.find((k) => k.name === n || k.name.endsWith("|" + n));
+    if (c) return c;
+  }
+  return null;
+}
+function animate(obj, clips, names, opts = {}) {
+  const clip = findClip(clips, names);
+  if (!clip) return null;
+  const mixer = new THREE.AnimationMixer(obj);
+  const act = mixer.clipAction(clip);
+  act.timeScale = opts.timeScale ?? 1;
+  act.play();
+  mixer.setTime(Math.random() * clip.duration);
+  mixers.push(mixer);
+  return { mixer, act };
+}
+
+// ---- Obstacle fade (props between camera and player go semi-transparent) ----
+const occluders = [];
+function addOccluder(obj, radius) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const c = new THREE.Vector3(); box.getCenter(c);
+  const sz = new THREE.Vector3(); box.getSize(sz);
+  occluders.push({ obj, center: c, radius: radius ?? Math.max(1.2, Math.max(sz.x, sz.z) * 0.45), height: sz.y, faded: false, mats: null, cur: 1 });
+}
+function fadeMats(o) {
+  if (o.mats) return o.mats;
+  o.mats = [];
+  o.obj.traverse((m) => {
+    if (!m.isMesh || !m.material) return;
+    const arr = Array.isArray(m.material) ? m.material : [m.material];
+    const cl = arr.map((x) => { const y = x.clone(); y.transparent = true; y.userData.baseOpacity = x.opacity ?? 1; return y; });
+    m.material = Array.isArray(m.material) ? cl : cl[0];
+    o.mats.push(...cl);
+  });
+  return o.mats;
+}
+const _seg = new THREE.Vector3(), _tmp = new THREE.Vector3(), _cp = new THREE.Vector3();
+function updateOcclusion(dt) {
+  if (!playerMesh) return;
+  const target = new THREE.Vector3(player.x, (player.onPlatform ? 1.4 : 0) + 1.0, player.y);
+  const cam = camera.position;
+  _seg.subVectors(target, cam);
+  const len2 = _seg.lengthSq();
+  for (const o of occluders) {
+    if (Math.abs(o.center.x - player.x) > 45 || Math.abs(o.center.z - player.y) > 45) {
+      if (o.cur >= 1) continue;
+    }
+    // closest point on cam->player segment to occluder axis (sample at mid height)
+    _tmp.subVectors(o.center, cam);
+    let t = Math.max(0, Math.min(1, _tmp.dot(_seg) / len2));
+    _cp.copy(cam).addScaledVector(_seg, t);
+    const dx = _cp.x - o.center.x, dz = _cp.z - o.center.z;
+    const withinY = _cp.y < o.center.y + o.height * 0.5 + 0.5;
+    const hit = t > 0.05 && t < 0.97 && withinY && dx * dx + dz * dz < o.radius * o.radius;
+    const goal = hit ? 0.28 : 1;
+    if (Math.abs(o.cur - goal) < 0.001) continue;
+    o.cur += (goal - o.cur) * Math.min(1, dt * 10);
+    if (Math.abs(o.cur - goal) < 0.01) o.cur = goal;
+    for (const m of fadeMats(o)) { m.opacity = m.userData.baseOpacity * o.cur; m.depthWrite = o.cur > 0.99; }
+  }
+}
+async function loadModel(url) {
+  await ensureModel(url);
+  return cloneModel(url);
+}
+
+function fitScale(obj, targetHeight) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const h = Math.max(size.y, 0.001);
+  const s = targetHeight / h;
+  obj.scale.setScalar(s);
+  box.setFromObject(obj);
+  obj.position.y -= box.min.y;
+  return obj;
+}
+
+function place(obj, x, z, rotY = 0, occlude = false) {
+  obj.position.x = x;
+  obj.position.z = z;
+  obj.rotation.y = rotY;
+  scene.add(obj);
+  if (occlude) addOccluder(obj);
+  return obj;
+}
+
+function clearRoadish(x, z) {
+  if (inLake(x, z) || inPlatform(x, z)) return false;
+  const d = Math.hypot(x, z);
+  if (Math.abs(d - RING_R) < ROAD_W + 1.5) return false;
+  if (Math.abs(x) < CARDINAL_HALF_W + 3 && Math.abs(z) > RING_R - 6) return false;
+  if (Math.abs(z) < CARDINAL_HALF_W + 3 && Math.abs(x) > RING_R - 6) return false;
+  if (Math.abs(z) < BRIDGE_W && Math.abs(x) > PLATFORM_R - 2 && Math.abs(x) < RING_R + 2) return false;
+  if (z < WALL_Y + 8) return false;
+  return true;
+}
+
+let playerMesh = null;
+let playerAnim = null;
+const bobbers = [];
+const walkers = [];
+
+async function dressScene() {
+  addGround();
+  await loadRigClips();
+  ringRoadMesh();
+  cardinalRoads();
+  lakeAndPlatform();
+  fireWall();
+
+  // try HDRI (optional)
+  try {
+    const rgbe = new RGBELoader();
+    const tex = await rgbe.loadAsync("models/hdr/autumn_forest_04_1k.hdr");
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = tex;
+  } catch (_) { /* offline / missing ok */ }
+
+  const forest = {
+    t1: "models/kaykit-forest/Tree_1_A_Color1.gltf",
+    t2: "models/kaykit-forest/Tree_2_B_Color1.gltf",
+    t3: "models/kaykit-forest/Tree_3_A_Color1.gltf",
+    t4: "models/kaykit-forest/Tree_4_A_Color1.gltf",
+    bare1: "models/kaykit-forest/Tree_Bare_1_A_Color1.gltf",
+    bare2: "models/kaykit-forest/Tree_Bare_2_A_Color1.gltf",
+    b1: "models/kaykit-forest/Bush_1_A_Color1.gltf",
+    b2: "models/kaykit-forest/Bush_2_A_Color1.gltf",
+    b3: "models/kaykit-forest/Bush_3_A_Color1.gltf",
+    b4: "models/kaykit-forest/Bush_4_A_Color1.gltf",
+    r1: "models/kaykit-forest/Rock_1_A_Color1.gltf",
+    r2: "models/kaykit-forest/Rock_2_A_Color1.gltf",
+    r3: "models/kaykit-forest/Rock_3_A_Color1.gltf",
+  };
+
+  // Preload key templates
+  const treeUrls = [forest.t1, forest.t2, forest.t3, forest.t4];
+  const bareUrls = [forest.bare1, forest.bare2];
+  const bushUrls = [forest.b1, forest.b2, forest.b3, forest.b4];
+  const rockUrls = [forest.r1, forest.r2, forest.r3];
+  await Promise.all([...treeUrls, ...bareUrls, ...bushUrls, ...rockUrls].map(ensureModel));
+
+  // Density: denser W/S, scorched NE with bare trees
+  for (let i = 0; i < 220; i++) {
+    const x = (rand() - 0.5) * (WORLD - 8);
+    const z = (rand() - 0.5) * (WORLD - 8);
+    if (!clearRoadish(x, z)) continue;
+    const west = x < -20;
+    const south = z > 20;
+    const ne = x > 25 && z < -20;
+    const keep = west || south ? 0.85 : ne ? 0.55 : 0.45;
+    if (rand() > keep) continue;
+    let url, h;
+    if (ne && rand() < 0.55) {
+      url = bareUrls[(rand() * bareUrls.length) | 0];
+      h = 4.5 + rand() * 3.5;
+    } else {
+      url = treeUrls[(rand() * treeUrls.length) | 0];
+      h = (west || south ? 6.5 : 5.2) + rand() * 4;
+    }
+    const tree = cloneModel(url);
+    fitScale(tree, h);
+    tree.rotation.y = rand() * Math.PI * 2;
+    place(tree, x, z, tree.rotation.y, true);
+  }
+
+  for (let i = 0; i < 90; i++) {
+    const x = (rand() - 0.5) * (WORLD - 10);
+    const z = (rand() - 0.5) * (WORLD - 10);
+    if (!clearRoadish(x, z)) continue;
+    if (rand() > (x < 0 || z > 0 ? 0.7 : 0.4)) continue;
+    const bush = cloneModel(bushUrls[(rand() * bushUrls.length) | 0]);
+    fitScale(bush, 1.2 + rand() * 1.4);
+    place(bush, x, z, rand() * Math.PI * 2, true);
+  }
+
+  for (let i = 0; i < 35; i++) {
+    const x = (rand() - 0.5) * (WORLD - 12);
+    const z = (rand() - 0.5) * (WORLD - 12);
+    if (!clearRoadish(x, z)) continue;
+    const rock = cloneModel(rockUrls[(rand() * rockUrls.length) | 0]);
+    fitScale(rock, 0.8 + rand() * 1.6);
+    place(rock, x, z, rand() * Math.PI * 2);
+  }
+
+  // Bridges (Kenney wood + Hex bridge props)
+  await Promise.all([
+    ensureModel("models/kenney/bridge_wood.glb"),
+    ensureModel("models/hex/building_bridge_A.gltf")
+  ]);
+
+  async function makeBridge(sign) {
+    // sign +1 = east bridge, -1 = west
+    const midX = sign * ((PLATFORM_R + RING_R) / 2);
+    const bw = cloneModel("models/kenney/bridge_wood.glb");
+    fitScale(bw, 1.1);
+    const box = new THREE.Box3().setFromObject(bw);
+    const size = new THREE.Vector3(); box.getSize(size);
+    const need = RING_R - PLATFORM_R + 2;
+    if (size.x > 0.01) bw.scale.x *= need / size.x;
+    bw.position.set(midX, 1.15, 0);
+    bw.rotation.y = sign > 0 ? 0 : Math.PI;
+    scene.add(bw);
+
+    const hb = cloneModel("models/hex/building_bridge_A.gltf");
+    fitScale(hb, 2.2);
+    hb.position.set(midX, 0, 0);
+    hb.rotation.y = Math.PI / 2;
+    // hide if too big — keep as accent near ring end
+    hb.position.x = sign * (RING_R - 2);
+    scene.add(hb);
+
+    // simple plank fallback deck
+    const deck = new THREE.Mesh(
+      new THREE.BoxGeometry(need, 0.35, BRIDGE_W - 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x8a6a42, roughness: 0.85 })
+    );
+    deck.position.set(midX, 1.05, 0);
+    deck.castShadow = true;
+    deck.receiveShadow = true;
+    scene.add(deck);
+  }
+  await makeBridge(1);
+  await makeBridge(-1);
+
+  // South shack spawn
+  const cabin = await loadModel("models/byndwalker/cabbin_1.glb");
+  fitScale(cabin, 4.5);
+  place(cabin, -2.5, HALF - 12, Math.PI * 0.15, true);
+  const cabin2 = await loadModel("models/byndwalker/cabbin_2.glb");
+  fitScale(cabin2, 3.2);
+  place(cabin2, 4, HALF - 9, -0.4, true);
+  const stump = await loadModel("models/kenney/stump_squareDetailedWide.glb");
+  fitScale(stump, 1.0);
+  place(stump, 1.5, HALF - 7, 0.5);
+  const shackLab = makeLabel("Shack / Spawn", "#d8e8a8");
+  shackLab.position.set(0, 5.5, HALF - 10);
+  scene.add(shackLab);
+
+  // Roadside encampments (tents) — N/E/W/S cardinals + ring
+  const tentUrls = [
+    "models/byndwalker/tent_1.glb", "models/byndwalker/tent_2.glb",
+    "models/byndwalker/tent_3.glb", "models/byndwalker/tent_4.glb",
+    "models/hex/tent.gltf"
+  ];
+  const campSites = [
+    // near S road
+    [10, 70], [-12, 78], [8, 55],
+    // W road denser woods camp
+    [-70, 8], [-78, -6], [-62, 18], [-85, 12],
+    // E road
+    [68, 10], [75, -8], [82, 14],
+    // N road approaching fire
+    [8, -70], [-10, -78], [12, -88],
+    // ring shoulders
+    [38, 28], [-36, 30], [30, -35], [-32, -28]
+  ];
+  for (const [x, z] of campSites) {
+    if (inLake(x, z)) continue;
+    const tent = await loadModel(tentUrls[(rand() * tentUrls.length) | 0]);
+    fitScale(tent, 2.4 + rand() * 1.2);
+    place(tent, x, z, rand() * Math.PI * 2, true);
+    if (rand() < 0.55) {
+      const fire = await loadModel("models/kenney/campfire_logs.glb");
+      fitScale(fire, 0.7);
+      place(fire, x + 2.2, z + 1.5, rand());
+      const pl = new THREE.PointLight(0xff7722, 0.7, 12, 2);
+      pl.position.set(x + 2.2, 1.2, z + 1.5);
+      scene.add(pl);
+    }
+    if (rand() < 0.4) {
+      const fence = await loadModel("models/byndwalker/branch_fence_1.glb");
+      fitScale(fence, 1.6);
+      place(fence, x - 2.5, z + 2, rand());
+    }
+  }
+
+  // Center bandit hideout
+  const stoneHouse = await loadModel("models/byndwalker/stone_house.glb");
+  fitScale(stoneHouse, 5.5);
+  place(stoneHouse, -3, -2, 0.4, true);
+  const bossTent = await loadModel("models/byndwalker/tent_2.glb");
+  fitScale(bossTent, 3.0);
+  place(bossTent, 5, 3, -0.6, true);
+  const logs = await loadModel("models/kenney/log_stack.glb");
+  fitScale(logs, 1.4);
+  place(logs, 4, -5, 0.2);
+  const fenceP = await loadModel("models/kenney/fence_planks.glb");
+  fitScale(fenceP, 1.5);
+  place(fenceP, -6, 5, Math.PI / 4);
+  const skelBoss = await loadModel("models/chars/Skeleton_Warrior.glb");
+  fitScale(skelBoss, 2.4);
+  place(skelBoss, 0, 1, Math.PI);
+  animate(skelBoss, rigClips, ["Idle_B", "Idle_A"]);
+  const bossLab = makeLabel("Bandit boss / hideout", "#f0a888");
+  bossLab.position.set(0, 6.5, 0);
+  scene.add(bossLab);
+
+  // NE spirit / ruins / fire vibe
+  const ruins = await loadModel("models/hex/building_destroyed.gltf");
+  fitScale(ruins, 6.5);
+  place(ruins, landmarks[2].x - 2, landmarks[2].y + 2, 0.3, true);
+  const col1 = await loadModel("models/kenney/statue_column.glb");
+  fitScale(col1, 4.5);
+  place(col1, landmarks[2].x + 5, landmarks[2].y - 3, 0.1, true);
+  const col2 = await loadModel("models/kenney/statue_column.glb");
+  fitScale(col2, 3.8);
+  place(col2, landmarks[2].x - 6, landmarks[2].y - 1, -0.4);
+  const tallRock = await loadModel("models/kenney/stone_tallA.glb");
+  fitScale(tallRock, 3.2);
+  place(tallRock, landmarks[2].x + 2, landmarks[2].y + 6, 0.5);
+  const ghost = await loadModel("models/quaternius/Ghost.glb");
+  fitScale(ghost, 2.8);
+  place(ghost, landmarks[2].x, landmarks[2].y, 0);
+  bobbers.push({ obj: ghost, baseY: ghost.position.y, phase: 0 });
+  animate(ghost, ghost.userData.clips, ["Flying_Idle"]);
+  const spiritLab = makeLabel("Dark spirit / ruins", "#c8b8f0");
+  spiritLab.position.set(landmarks[2].x, 7.5, landmarks[2].y);
+  scene.add(spiritLab);
+  // scorched bare cluster NE
+  for (let i = 0; i < 12; i++) {
+    const ang = rand() * Math.PI * 2;
+    const rad = 6 + rand() * 14;
+    const x = landmarks[2].x + Math.cos(ang) * rad;
+    const z = landmarks[2].y + Math.sin(ang) * rad;
+    const bare = cloneModel(bareUrls[(rand() * bareUrls.length) | 0]);
+    fitScale(bare, 4 + rand() * 3);
+    place(bare, x, z, rand() * 6, true);
+  }
+
+  // SW legendary / beasts
+  const dragon = await loadModel("models/quaternius/Dragon.glb");
+  fitScale(dragon, 5.5);
+  place(dragon, landmarks[1].x, landmarks[1].y, Math.PI * 0.7);
+  bobbers.push({ obj: dragon, baseY: dragon.position.y, phase: 1.2, amp: 0.25 });
+  animate(dragon, dragon.userData.clips, ["Flying_Idle"]);
+  const animals = [
+    ["models/quaternius/Wolf.glb", landmarks[1].x + 6, landmarks[1].y + 4, 2.0],
+    ["models/quaternius/Wolf.glb", landmarks[1].x - 5, landmarks[1].y + 2, 1.9],
+    ["models/quaternius/Fox.glb", landmarks[1].x + 3, landmarks[1].y - 6, 1.4],
+    ["models/quaternius/Deer.glb", landmarks[1].x - 8, landmarks[1].y - 4, 2.2],
+    ["models/quaternius/Stag.glb", landmarks[1].x + 8, landmarks[1].y - 2, 2.6]
+  ];
+  for (const [url, x, z, h] of animals) {
+    const a = await loadModel(url);
+    fitScale(a, h);
+    place(a, x, z, rand() * Math.PI * 2);
+    animate(a, a.userData.clips, [rand() < 0.5 ? "Idle" : "Eating", "Idle"]);
+  }
+  // West beast quadrant: full Quaternius Animated Animal Pack (12) in dens off the W road.
+  // Grazers idle/eat; wolves/huskies/foxes patrol (Walk) on small loops.
+  const Q = (n) => "models/quaternius/" + n + ".glb";
+  const westDens = [
+    // [x, z, [ [model, height, behaviour], ... ]]
+    [-72, -28, [["Wolf", 2.0, "patrol"], ["Wolf", 1.9, "patrol"], ["Husky", 1.8, "idle"]]],
+    [-88, 30, [["Horse", 3.0, "graze"], ["WhiteHorse", 3.0, "graze"], ["Donkey", 2.4, "idle"]]],
+    [-58, 52, [["Bull", 2.6, "idle"], ["Cow", 2.4, "graze"], ["Alpaca", 2.6, "graze"]]],
+    [-95, -50, [["Stag", 2.8, "idle"], ["Deer", 2.2, "graze"], ["Fox", 1.4, "patrol"]]],
+    [-50, -62, [["ShibaInu", 1.3, "patrol"], ["Fox", 1.4, "idle"], ["Husky", 1.8, "patrol"]]]
+  ];
+  for (const [cx, cz, list] of westDens) {
+    for (let i = 0; i < list.length; i++) {
+      const [name, h, beh] = list[i];
+      const ang = (i / list.length) * Math.PI * 2 + rand();
+      const x = cx + Math.cos(ang) * 4, z = cz + Math.sin(ang) * 4;
+      if (!clearRoadish(x, z)) continue;
+      const a = await loadModel(Q(name));
+      fitScale(a, h);
+      place(a, x, z, rand() * Math.PI * 2);
+      if (beh === "patrol") {
+        animate(a, a.userData.clips, ["Walk"]);
+        walkers.push({ obj: a, cx, cz, r: 5 + rand() * 3, ang, speed: 0.25 + rand() * 0.15 });
+      } else {
+        animate(a, a.userData.clips, beh === "graze" ? ["Eating", "Idle"] : ["Idle", "Idle_2"]);
+      }
+    }
+  }
+  const westLab = makeLabel("West beast dens", "#d0c090");
+  westLab.position.set(-75, 6, 0 + 12);
+  scene.add(westLab);
+  const legLab = makeLabel("Legendary / beasts", "#f0d080");
+  legLab.position.set(landmarks[1].x, 7, landmarks[1].y);
+  scene.add(legLab);
+
+  // Trash skeletons by quadrant (feel markers, not combat)
+  const trashSpots = [
+    [50, 50], [-55, 48], [52, -48], [-48, -55],
+    [40, 70], [-70, 40], [70, -35], [-35, 65]
+  ];
+  for (let i = 0; i < trashSpots.length; i++) {
+    const [x, z] = trashSpots[i];
+    const url = i % 2 === 0 ? "models/chars/Skeleton_Minion.glb" : "models/chars/Skeleton_Warrior.glb";
+    const sk = await loadModel(url);
+    fitScale(sk, 1.8 + (i % 3) * 0.15);
+    place(sk, x, z, rand() * Math.PI * 2);
+    if (i % 3 === 0) {
+      animate(sk, rigClips, ["Walking_B", "Walking_A"], { timeScale: 0.8 });
+      walkers.push({ obj: sk, cx: x, cz: z, r: 3.5, ang: rand() * 6.28, speed: 0.35 });
+    } else {
+      animate(sk, rigClips, [i % 2 ? "Idle_B" : "Idle_A"]);
+    }
+  }
+
+  // Road labels
+  for (const [txt, x, z] of [["N road", 0, -RING_R - 8], ["S road", 0, RING_R + 8], ["E", RING_R + 12, 0], ["W", -(RING_R + 12), 0]]) {
+    const lab = makeLabel(txt, "rgba(220,220,200,0.7)");
+    lab.position.set(x, 3, z);
+    scene.add(lab);
+  }
+
+  // Player ranger
+  playerMesh = await loadModel("models/chars/Ranger.glb");
+  fitScale(playerMesh, 2.1);
+  scene.add(playerMesh);
+  {
+    const mixer = new THREE.AnimationMixer(playerMesh);
+    const idle = findClip(rigClips, ["Idle_A"]);
+    const walk = findClip(rigClips, ["Walking_A"]);
+    playerAnim = { mixer, idle: idle && mixer.clipAction(idle), walk: walk && mixer.clipAction(walk), moving: false };
+    if (playerAnim.idle) playerAnim.idle.play();
+    if (playerAnim.walk) { playerAnim.walk.play(); playerAnim.walk.setEffectiveWeight(0); }
+    mixers.push(mixer);
+  }
+
+  // Kenney pine accents W/S
+  for (let i = 0; i < 18; i++) {
+    const x = -40 - rand() * 55;
+    const z = (rand() - 0.3) * 100;
+    if (!clearRoadish(x, z)) continue;
+    const pine = await loadModel("models/kenney/tree_pineTallB.glb");
+    fitScale(pine, 7 + rand() * 4);
+    place(pine, x, z, rand(), true);
+  }
+}
+
+function updateCamera() {
+  const target = new THREE.Vector3(player.x, player.onPlatform ? 1.4 : 0, player.y);
+  const desired = target.clone().add(camOffset);
+  camera.position.lerp(desired, 0.12);
+  camera.lookAt(target.x, target.y + 1.2, target.z);
+}
+
+function frame(ts) {
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min(0.05, (ts - lastTs) / 1000);
+  lastTs = ts;
+
+  const dir = inputDir();
+  const moving = Math.hypot(dir.x, dir.y) > 0;
+  if (playerAnim && playerAnim.idle && playerAnim.walk && moving !== playerAnim.moving) {
+    playerAnim.moving = moving;
+    const from = moving ? playerAnim.idle : playerAnim.walk, to = moving ? playerAnim.walk : playerAnim.idle;
+    to.reset().setEffectiveWeight(1).play();
+    from.crossFadeTo(to, 0.2, false);
+  }
+  if (moving) {
+    elapsed += dt;
+    const speed = WALK_SPEED * (player.onPlatform ? 0.92 : 1);
+    tryMove(player.x + dir.x * speed * dt, player.y + dir.y * speed * dt);
+    player.facing = Math.atan2(dir.x, dir.y);
+  }
+  timerEl.textContent = elapsed.toFixed(1) + "s";
+  nearestEl.textContent = nearestLandmark().label;
+  updateProgress();
+
+  if (playerMesh) {
+    playerMesh.position.set(player.x, player.onPlatform ? 1.4 : 0, player.y);
+    // ground snap already in fitScale; raise on platform
+    const box = new THREE.Box3().setFromObject(playerMesh);
+    // keep feet on platform top roughly
+    playerMesh.position.y = player.onPlatform ? 1.4 : 0;
+    playerMesh.rotation.y = player.facing;
+  }
+
+  for (const b of bobbers) {
+    const amp = b.amp ?? 0.45;
+    b.obj.position.y = b.baseY + Math.sin(ts * 0.002 + b.phase) * amp;
+    b.obj.rotation.y += dt * 0.35;
+  }
+  for (const w of walkers) {
+    w.ang += dt * w.speed;
+    const nx = w.cx + Math.cos(w.ang) * w.r, nz = w.cz + Math.sin(w.ang) * w.r;
+    w.obj.rotation.y = Math.atan2(nx - w.obj.position.x, nz - w.obj.position.z);
+    w.obj.position.x = nx; w.obj.position.z = nz;
+  }
+  for (const m of mixers) m.update(dt);
+  fireLight.intensity = 2.0 + Math.sin(ts * 0.006) * 0.5;
+
+  updateCamera();
+  updateOcclusion(dt);
+  drawMinimap();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+loadEl.textContent = "Dressing Darkwood…";
+dressScene()
+  .then(() => {
+    loadEl.classList.add("hide");
+    requestAnimationFrame(frame);
+  })
+  .catch((err) => {
+    console.error(err);
+    loadEl.textContent = "Load failed — use npx serve (modules need http). " + (err && err.message ? err.message : err);
+  });
+  </script>
+</body>
+</html>

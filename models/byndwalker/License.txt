@@ -1,0 +1,81 @@
+================================================================================
+                                 LICENSE / 授权协议
+================================================================================
+
+本授权协议适用于本资产包（以下简称“资产”）的所有使用者。请仔细阅读以下条款：
+This License Agreement applies to all users of this asset pack (hereinafter 
+referred to as the "Assets"). Please read the following terms carefully:
+
+--------------------------------------------------------------------------------
+1. 免费内容协议 / Free Content License ("Free" Folder)
+--------------------------------------------------------------------------------
+【中文】
+本资产包中 "Free" 文件夹内的所有内容，均采用 CC0 1.0 通用协议（知识共享公共
+领域宣告）发布。在法律允许的范围内，作者已经放弃了该文件夹内作品的所有著作权
+以及相关或邻接权利。您可以自由地复制、修改、分发该文件夹内的任何资产，甚至
+用于商业目的，均无需征得作者同意，也无需进行署名。
+
+【English】
+All content within the "Free" folder of this asset pack is dedicated to the 
+public domain under the CC0 1.0 Universal (CC0 1.0) Public Domain Dedication.
+To the extent possible under law, the author has waived all copyright and 
+related or neighboring rights to the works in this folder. You can copy, 
+modify, distribute, and perform the assets in this specific folder, even for 
+commercial purposes, all without asking permission and without requiring 
+attribution.
+
+--------------------------------------------------------------------------------
+2. 完整版/收费内容协议 / Full Content License (Other Files & Folders)
+--------------------------------------------------------------------------------
+【中文】
+除 "Free" 文件夹以外的所有其他文件与资产（以下简称“完整版资产”），受以下
+独立商业许可条款约束：
+
+允许的使用范围 (Allowed)：
+- 您可以无限期、全球性、非独占地将完整版资产用于您的商业或非商业项目（包括
+  游戏开发、数字动画、影视作品、交互式软件等）。
+- 您可以为了适配项目需求，对这些资产进行任意的修改、缩放、重构或格式转换。
+
+严格禁止的范围 (Prohibited - 严禁二次售卖)：
+- 严禁二次销售与分发：您不能将本资产包中的文件（无论是原始格式还是修改后的
+  格式）作为独立资产或资产包的一部分进行转售、免费分发、分享、赠送、转授权，
+  或将其上传到任何公共资源商店、网盘、GitHub 等平台供他人下载。
+- 禁止资产提取：包含本资产的最终发布产品（如游戏）必须经过编译或打包，使用
+  户在正常情况下无法直接提取出原始的数字资产文件。
+
+【English】
+All other files and assets outside the "Free" folder (hereinafter referred to 
+as the "Full Version Assets") are governed by the following proprietary 
+commercial license:
+
+Allowed Uses:
+- You are granted a perpetual, worldwide, non-exclusive license to use the 
+  Full Version Assets in your commercial or non-commercial projects (such as 
+  video games, digital animations, films, interactive software, etc.).
+- You are free to modify, resize, retexturing, or convert the format of these 
+  assets to fit your project requirements.
+
+Prohibited Uses (No Reselling/Redistribution):
+- No Reselling or Redistribution: You cannot resell, distribute, share, 
+  sub-license, give away, or host the files in this asset pack (whether in 
+  their original or modified forms) as standalone digital assets or as part 
+  of any asset bundle. Uploading these files to public asset stores, cloud 
+  drives, GitHub, or any platforms for others to download is strictly prohibited.
+- No Asset Extraction: The end product (e.g., a video game) incorporating 
+  these assets must be compiled or packaged in a way that prevents end-users 
+  from easily extracting the original digital asset files under normal 
+  circumstances.
+
+--------------------------------------------------------------------------------
+3. 免责声明 / Limitation of Liability
+--------------------------------------------------------------------------------
+【中文】
+所有资产均按“原样”提供，不附带任何明示或暗示的担保。作者不对因使用或无法使用
+这些资产而导致的任何直接、间接或附带损失承担责任。
+
+【English】
+The Assets are provided "as is", without warranty of any kind, express or 
+implied. In no event shall the author be liable for any claim, damages, or 
+other liability arising from the use of or inability to use the Assets.
+
+================================================================================
