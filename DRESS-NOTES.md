@@ -84,3 +84,8 @@ Lean copies live under `graybox/models/` (~9 MB). Provenance packs remain under 
 - **Respawn:** 20s, full HP.
 - **Perf:** single pooled `THREE.Points` (1400 particles × 4 verts incl. trails), struct-of-arrays state, no per-frame allocations in the FX loop.
 - Known: no regular bandit enemies yet (only the king); enemies don't fight back; dissolve is scale-only (no material fade); on phones the walk script collapses to the current step to make room for combat buttons.
+
+## 2026-11-02 — Move speed 2x + Training Yard
+- `WALK_SPEED` 3.85 → 7.7 (exactly 2x). Player walk clip `timeScale` 1 → 2 to limit foot skate.
+- Training Yard: 4 stationary KayKit skeleton dummies (Minion/Warrior, Idle_A, no patrol, don't fight back) in a 2x2 grid at x 10–12.6, z HALF-13..HALF-10, east of the shack spawn and off the S road; "Training Yard" label. Registered as `skeleton` trash (30 HP, HP bars, damage numbers, Nature-green essence stream, +1 Armor).
+- `regEnemy` opts: `respawn` (seconds, default 20) and `dummy`. Dummies respawn at the same spot with full HP 1.0s after the killing blow (0.35s shrink + 0.65s hidden). Debug: `window.__dummyRespawnMs` logs measured game/wall delay.

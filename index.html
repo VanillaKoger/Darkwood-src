@@ -265,7 +265,7 @@ const BRIDGE_W = 6;
 const WALL_THICK = 4;
 // Design lock: north fire wall. World +Y = south (same as 2b). North = -Y.
 const WALL_Y = -(HALF - 6);
-const WALK_SPEED = 3.85;
+const WALK_SPEED = 7.7; // 2x base (was 3.85)
 const PLAYER_R = 1.15;
 
 const canvas = document.getElementById("game");
@@ -1116,6 +1116,17 @@ async function dressScene() {
     regEnemy(sk, "skeleton");
   }
 
+  // Training Yard — stationary dummies east of the shack spawn, off the S road; 1.0s respawn
+  for (let i = 0; i < 4; i++) {
+    const x = 10 + (i % 2) * 2.6, z = HALF - 13 + Math.floor(i / 2) * 3;
+    const d = await loadModel(i % 2 ? "models/chars/Skeleton_Warrior.glb" : "models/chars/Skeleton_Minion.glb");
+    fitScale(d, 1.8);
+    place(d, x, z, Math.PI * 1.5);
+    animate(d, rigClips, ["Idle_A"]);
+    regEnemy(d, "skeleton", { respawn: 1.0, dummy: true });
+  }
+  { const yl = makeLabel("Training Yard", "#f0e0a0"); yl.position.set(11.3, 4, HALF - 11.5); scene.add(yl); }
+
   // Road labels
   for (const [txt, x, z] of [["N road", 0, -RING_R - 8], ["S road", 0, RING_R + 8], ["E", RING_R + 12, 0], ["W", -(RING_R + 12), 0]]) {
     const lab = makeLabel(txt, "rgba(220,220,200,0.7)");
@@ -1133,7 +1144,7 @@ async function dressScene() {
     const walk = findClip(rigClips, ["Walking_A"]);
     playerAnim = { mixer, idle: idle && mixer.clipAction(idle), walk: walk && mixer.clipAction(walk), moving: false };
     if (playerAnim.idle) playerAnim.idle.play();
-    if (playerAnim.walk) { playerAnim.walk.play(); playerAnim.walk.setEffectiveWeight(0); }
+    if (playerAnim.walk) { playerAnim.walk.timeScale = 2; playerAnim.walk.play(); playerAnim.walk.setEffectiveWeight(0); }
     mixers.push(mixer);
   }
 
@@ -1180,7 +1191,7 @@ function regEnemy(obj, type, opts = {}) {
   barObj.visible = false;
   scene.add(barObj);
   const maxHp = opts.hp ?? (opts.boss ? 260 : type === "beast" ? 40 : 30);
-  enemies.push({ obj, type, boss: !!opts.boss, gain: TYPE_GAIN[opts.gainType || type], maxHp, hp: maxHp,
+  enemies.push({ obj, type, boss: !!opts.boss, gain: TYPE_GAIN[opts.gainType || type], maxHp, hp: maxHp, respawn: opts.respawn ?? 20, dummy: !!opts.dummy,
     h, r, bar, fill: bar.firstChild, barObj, baseScale: obj.scale.clone(), state: "alive", t: 0, lastHit: -99 });
 }
 
@@ -1348,7 +1359,7 @@ function updateFloatText(dt) {
 function playerY() { return player.onPlatform ? 1.4 : 0; }
 
 function killEnemy(e, forceBoss) {
-  e.state = "dying"; e.t = 0; e.barObj.visible = false;
+  e.state = "dying"; if (e.dummy) { e.diedAt = elapsedReal; e.diedWall = performance.now(); } e.t = 0; e.barObj.visible = false;
   stats.kills++;
   const p = e.obj.position;
   spawnAbsorb(p.x, p.y + e.h * 0.4, p.z, e.gain, forceBoss || e.boss);
@@ -1396,7 +1407,7 @@ function updateCombat(dt) {
       if (k >= 1) { e.obj.visible = false; e.state = "dead"; e.t = 0; }
     } else if (e.state === "dead") {
       e.t += dt;
-      if (e.t >= 20) { e.state = "alive"; e.hp = e.maxHp; e.obj.visible = true; e.obj.scale.copy(e.baseScale); }
+      if (e.t >= (e.dummy ? e.respawn - 0.35 : e.respawn)) { if (e.dummy) (window.__dummyRespawnMs ||= []).push({ game: +(elapsedReal - e.diedAt).toFixed(3), wall: Math.round(performance.now() - e.diedWall) }); e.state = "alive"; e.hp = e.maxHp; e.obj.visible = true; e.obj.scale.copy(e.baseScale); }
     }
   }
 }
@@ -1420,7 +1431,7 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyT") { btnAuto.click(); }
 });
 updateStatsHud();
-window.__dw = { stats, enemies, bossTest, doAttack, spawnAbsorb, player };
+window.__dw = { stats, enemies, bossTest, doAttack, spawnAbsorb, player, WALK_SPEED };
 // ===================== end kill prototype =====================
 
 function updateCamera() {
