@@ -179,6 +179,7 @@
       pointer-events: auto;
     }
     .hpbar { width: 44px; height: 5px; background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.35); border-radius: 3px; transform: translate(-50%,-100%); pointer-events: none; }
+    .podcount { font: 600 10px system-ui, sans-serif; color: rgba(230,225,200,0.75); background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 8px; pointer-events: none; white-space: nowrap; }
     .hpbar i { display: block; height: 100%; width: 100%; background: #e04a3a; border-radius: 2px; }
     .ftxt { font: 700 14px system-ui, sans-serif; color: #fff; text-shadow: 0 1px 2px #000; pointer-events: none; white-space: nowrap; transform: translate(-50%,-100%); }
     .ftxt.dmg { color: #ffe08a; }
@@ -715,7 +716,7 @@ function endTouch(e) {
 window.addEventListener("pointerup", endTouch);
 window.addEventListener("pointercancel", endTouch);
 window.addEventListener("blur", () => endTouch());
-btnReset.addEventListener("click", () => { elapsed = 0; timerEl.textContent = "0.0s"; });
+btnReset.addEventListener("click", () => { elapsed = 0; timerEl.textContent = "0.0s"; if (typeof refillPods === "function") refillPods(); });
 
 const loader = new GLTFLoader();
 const cache = new Map();
@@ -1078,7 +1079,7 @@ async function dressScene() {
   place(ghost, landmarks[2].x, landmarks[2].y, 0);
   bobbers.push({ obj: ghost, baseY: ghost.position.y, phase: 0 });
   animate(ghost, ghost.userData.clips, ["Flying_Idle"]);
-  regEnemy(ghost, "spirit", { hp: 50 });
+  regEnemy(ghost, "spirit", { hp: 50, pod: { id: "spirit-ne", x: landmarks[2].x, z: landmarks[2].y } });
   const spiritLab = makeLabel("Dark spirit / ruins", "#c8b8f0");
   spiritLab.position.set(landmarks[2].x, 7.5, landmarks[2].y);
   scene.add(spiritLab);
@@ -1112,7 +1113,7 @@ async function dressScene() {
     fitScale(a, h);
     place(a, x, z, rand() * Math.PI * 2);
     animate(a, a.userData.clips, [rand() < 0.5 ? "Idle" : "Eating", "Idle"]);
-    regEnemy(a, "beast");
+    regEnemy(a, "beast", { pod: { id: "beasts-legendary-sw", x: landmarks[1].x, z: landmarks[1].y } });
   }
   // West beast quadrant: full Quaternius Animated Animal Pack (12) in dens off the W road.
   // Grazers idle/eat; wolves/huskies/foxes patrol (Walk) on small loops.
@@ -1136,11 +1137,11 @@ async function dressScene() {
       place(a, x, z, rand() * Math.PI * 2);
       if (beh === "patrol") {
         animate(a, a.userData.clips, ["Walk"]);
-        walkers.push({ obj: a, cx, cz, r: 5 + rand() * 3, ang, speed: 0.25 + rand() * 0.15 });
+        walkers.push({ obj: a, cx, cz, r: 3 + rand() * 1.5, ang, speed: 0.25 + rand() * 0.15 });
       } else {
         animate(a, a.userData.clips, beh === "graze" ? ["Eating", "Idle"] : ["Idle", "Idle_2"]);
       }
-      regEnemy(a, "beast");
+      regEnemy(a, "beast", { pod: { id: "den-" + cx + "_" + cz, x: cx, z: cz }, walker: beh === "patrol" });
     }
   }
   const westLab = makeLabel("West beast dens", "#d0c090");
@@ -1163,11 +1164,11 @@ async function dressScene() {
     place(sk, x, z, rand() * Math.PI * 2);
     if (i % 3 === 0) {
       animate(sk, rigClips, ["Walking_B", "Walking_A"], { timeScale: 0.8 });
-      walkers.push({ obj: sk, cx: x, cz: z, r: 3.5, ang: rand() * 6.28, speed: 0.35 });
+      walkers.push({ obj: sk, cx: x, cz: z, r: 3.5, ang: rand() * 6.28, speed: 0.35 }); sk.userData.walker = true;
     } else {
       animate(sk, rigClips, [i % 2 ? "Idle_B" : "Idle_A"]);
     }
-    regEnemy(sk, "skeleton");
+    regEnemy(sk, "skeleton", { pod: { id: "trash-" + i, x, z } });
   }
 
   // Training Yard — stationary dummies east of the shack spawn, off the S road; 1.0s respawn
@@ -1247,6 +1248,65 @@ function regEnemy(obj, type, opts = {}) {
   const maxHp = opts.hp ?? (opts.boss ? 260 : type === "beast" ? 40 : 30);
   enemies.push({ obj, type, boss: !!opts.boss, gain: TYPE_GAIN[opts.gainType || type], maxHp, hp: maxHp, respawn: opts.respawn ?? 20, dummy: !!opts.dummy,
     h, r, bar, fill: bar.firstChild, barObj, baseScale: obj.scale.clone(), state: "alive", t: 0, lastHit: -99 });
+  const e = enemies[enemies.length - 1];
+  // Pod model: fixed home, leash wander, shared per-pod respawn pool (not for bosses/dummies)
+  if (opts.pod && !e.boss && !e.dummy) {
+    let pod = pods.get(opts.pod.id);
+    if (!pod) {
+      const max = POD_POOL[type] ?? 4;
+      const el = document.createElement("div"); el.className = "podcount";
+      const lab = new CSS2DObject(el); lab.position.set(opts.pod.x, 2.2, opts.pod.z); lab.visible = false; scene.add(lab);
+      pod = { id: opts.pod.id, x: opts.pod.x, z: opts.pod.z, type, max, left: podSave.pools[opts.pod.id] ?? max, members: [], el, lab };
+      pods.set(pod.id, pod);
+    }
+    pod.members.push(e); e.pod = pod;
+    e.walker = !!(opts.walker || obj.userData.walker);
+    e.wx = obj.position.x; e.wz = obj.position.z; e.wt = Math.random() * 3;
+  }
+}
+
+// ---- Pods: respawn pools by bonus tier (better bonus → fewer respawns), daily reset at local midnight ----
+const POD_LEASH = 5, POD_WANDER_SPEED = 0.45, POD_RETURN_SPEED = 2.2;
+const POD_POOL = { beast: 5, skeleton: 4, spirit: 3, bandit: 3 }; // +1 HP trash / +1 Armor mid / +1% ASPD best
+const POD_KEY = "darkwood.pods.v1";
+const todayStr = () => { const d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); };
+const pods = new Map();
+let podSave = (() => { try { return JSON.parse(localStorage.getItem(POD_KEY)) || null; } catch { return null; } })();
+if (!podSave || podSave.date !== todayStr()) podSave = { date: todayStr(), pools: {} };
+function savePods() {
+  podSave.date = todayStr(); podSave.pools = {};
+  for (const p of pods.values()) podSave.pools[p.id] = p.left;
+  try { localStorage.setItem(POD_KEY, JSON.stringify(podSave)); } catch {}
+}
+function refillPods() {
+  for (const p of pods.values()) {
+    p.left = p.max;
+    for (const e of p.members) if (e.state === "dead") e.t = Math.max(e.t, e.respawn); // respawn now
+  }
+  savePods();
+}
+let podDayCheck = 0;
+function updatePods(dt) {
+  podDayCheck -= dt;
+  if (podDayCheck <= 0) { podDayCheck = 5; if (podSave.date !== todayStr()) refillPods(); }
+  for (const p of pods.values()) {
+    const anyAlive = p.members.some((e) => e.state !== "dead");
+    p.lab.visible = !anyAlive;
+    if (!anyAlive) p.el.textContent = p.left > 0 ? "\u21bb " + p.left : "0 \u00b7 resets 00:00";
+    for (const e of p.members) {
+      if (e.state !== "alive" || e.walker) continue;
+      const o = e.obj.position;
+      const home = Math.hypot(o.x - p.x, o.z - p.z);
+      let tx = e.wx, tz = e.wz, sp = POD_WANDER_SPEED;
+      if (home > POD_LEASH) { tx = p.x; tz = p.z; sp = POD_RETURN_SPEED; e.wt = 0; }
+      else {
+        e.wt -= dt;
+        if (e.wt <= 0) { const a = Math.random() * 6.283, r = Math.random() * (POD_LEASH - 0.5); e.wx = p.x + Math.cos(a) * r; e.wz = p.z + Math.sin(a) * r; e.wt = 4 + Math.random() * 5; }
+      }
+      const dx = tx - o.x, dz = tz - o.z, d = Math.hypot(dx, dz);
+      if (d > 0.15) { const st = Math.min(d, sp * dt); o.x += dx / d * st; o.z += dz / d * st; if (!e.type.startsWith("spirit")) e.obj.rotation.y = Math.atan2(dx, dz); }
+    }
+  }
 }
 
 // ---- Particle pool: one Points, heads + 3 trail ghosts each, additive ----
@@ -1456,7 +1516,8 @@ function updateCombat(dt) {
       if (k >= 1) { e.obj.visible = false; e.state = "dead"; e.t = 0; }
     } else if (e.state === "dead") {
       e.t += dt;
-      if (e.t >= (e.dummy ? e.respawn - 0.35 : e.respawn)) { if (e.dummy) (window.__dummyRespawnMs ||= []).push({ game: +(elapsedReal - e.diedAt).toFixed(3), wall: Math.round(performance.now() - e.diedWall) }); e.state = "alive"; e.hp = e.maxHp; e.obj.visible = true; e.obj.scale.copy(e.baseScale); }
+      if (e.pod && e.t >= e.respawn && e.pod.left <= 0) continue; // pool empty until daily reset
+      if (e.t >= (e.dummy ? e.respawn - 0.35 : e.respawn)) { if (e.pod) { e.pod.left--; savePods(); e.obj.position.x = e.pod.x + (Math.random() - 0.5) * 3; e.obj.position.z = e.pod.z + (Math.random() - 0.5) * 3; } if (e.dummy) (window.__dummyRespawnMs ||= []).push({ game: +(elapsedReal - e.diedAt).toFixed(3), wall: Math.round(performance.now() - e.diedWall) }); e.state = "alive"; e.hp = e.maxHp; e.obj.visible = true; e.obj.scale.copy(e.baseScale); }
     }
   }
 }
@@ -1475,7 +1536,7 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyB") bossTest();
 });
 updateStatsHud();
-window.__dw = { stats, enemies, bossTest, doAttack, spawnAbsorb, player, WALK_SPEED };
+window.__dw = { stats, enemies, pods, refillPods, bossTest, doAttack, spawnAbsorb, player, WALK_SPEED };
 // ===================== end kill prototype =====================
 
 function updateCamera() {
@@ -1534,6 +1595,7 @@ function frame(ts) {
   updateCamera();
   updateOcclusion(dt);
   updateCombat(dt);
+  updatePods(dt);
   updateParticles(dt, player.x, playerY() + 1.1, player.y);
   updatePulse(dt, player.x, playerY(), player.y);
   updateFloatText(dt);

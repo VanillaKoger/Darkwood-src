@@ -107,3 +107,13 @@ Lean copies live under `graybox/models/` (~9 MB). Provenance packs remain under 
 - Removed Attack button, Auto toggle, walk-script panel, controls/"drag anywhere" hints; Space/T keybinds removed (B = boss test kept).
 - Attacking is always auto (range 2.5m, period 0.6s / aspd).
 - Minimap moved to bottom-right corner (safe-area aware); joystick ignores touches on minimap/Boss test.
+
+## 2026-11-04 — Respawn model: pods + daily pools (LOCKED)
+- **Status: LOCKED.** Every non-boss enemy belongs to a fixed spawn **pod** (reusing the existing placements). Layout unchanged: lake ring, beasts W, spirits E/NE, legendary SW, bandit king at lake-center hideout.
+- **Pods:** 5 west beast dens, 1 legendary-area beast pod (SW), 8 trash skeleton pods (one per marker), 1 dark-spirit pod (NE). 
+- **Roaming:** idle enemies pick random points within a 5 m leash of the pod and drift at 0.45 m/s; if beyond 5 m they walk back at 2.2 m/s. Patrol walkers keep their loops, now r ≤ 4.5 m around the den.
+- **Pools (shared per pod, by bonus tier: better per-kill bonus means fewer respawns):** beast (+1 HP, trash) **5**, skeleton (+1 Armor, mid) **4**, spirit (+1% atk spd, best) **3**. Each respawn spends 1 from the pod's pool, using the same 20 s delay. Respawns appear within ±1.5 m of the pod. An empty pool stays empty until the **daily reset at local midnight**.
+- **Persistence:** `localStorage["darkwood.pods.v1"]` = `{ date, pools }`. On load or every 5 s, a date change refills every pool.
+- **UI:** a small dim pill floats over a pod only while nothing is alive there: `↻ N`, or `0 · resets 00:00`. No new HUD.
+- **Unchanged:** bosses (bandit king, legendary dragon) keep 20 s infinite respawn. Training Yard dummies keep their unlimited 1.0 s respawn.
+- **Debug:** **Reset timer** also refills every pool. `window.__dw.pods` / `__dw.refillPods()`.
